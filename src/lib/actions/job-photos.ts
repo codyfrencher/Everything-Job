@@ -1,10 +1,13 @@
 "use server";
 
-import { del } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 async function assertCanAccessJob(jobId: string) {
   const user = await requireUser();
@@ -17,11 +20,27 @@ async function assertCanAccessJob(jobId: string) {
   return user;
 }
 
-export async function addJobPhoto(jobId: string, url: string) {
+export async function uploadJobPhoto(jobId: string, formData: FormData) {
   const user = await assertCanAccessJob(jobId);
 
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "No file provided" };
+  }
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return { error: "Unsupported file type" };
+  }
+  if (file.size > MAX_SIZE_BYTES) {
+    return { error: "Photo is too large (max 10MB)" };
+  }
+
+  const blob = await put(file.name, file, {
+    access: "public",
+    addRandomSuffix: true,
+  });
+
   await db.jobPhoto.create({
-    data: { jobId, url, uploadedById: user.id },
+    data: { jobId, url: blob.url, uploadedById: user.id },
   });
 
   revalidatePath(`/jobs/${jobId}`);
