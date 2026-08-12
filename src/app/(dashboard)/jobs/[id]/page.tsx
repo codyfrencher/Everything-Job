@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 import { updateJob, deleteJob } from "@/lib/actions/jobs";
 import { JobForm } from "@/components/job-form";
+import { JobPhotos } from "@/components/job-photos";
 import { DeleteButton } from "@/components/delete-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -15,7 +16,10 @@ export default async function JobDetailPage({
   const user = await requireUser();
   const { id } = await params;
 
-  const job = await db.job.findUnique({ where: { id } });
+  const job = await db.job.findUnique({
+    where: { id },
+    include: { photos: { orderBy: { createdAt: "desc" } } },
+  });
   if (!job) notFound();
   if (user.role === "TECH" && job.assignedToId !== user.id) notFound();
 
@@ -55,6 +59,19 @@ export default async function JobDetailPage({
             techs={techs}
             action={updateJobWithId}
             submitLabel="Save changes"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Photos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <JobPhotos
+            jobId={job.id}
+            photos={job.photos}
+            canDelete={canManage || job.assignedToId === user.id}
           />
         </CardContent>
       </Card>
