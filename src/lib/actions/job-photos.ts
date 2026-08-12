@@ -34,14 +34,19 @@ export async function uploadJobPhoto(jobId: string, formData: FormData) {
     return { error: "Photo is too large (max 10MB)" };
   }
 
-  const blob = await put(file.name, file, {
-    access: "public",
-    addRandomSuffix: true,
-  });
+  try {
+    const blob = await put(file.name, file, {
+      access: "public",
+      addRandomSuffix: true,
+    });
 
-  await db.jobPhoto.create({
-    data: { jobId, url: blob.url, uploadedById: user.id },
-  });
+    await db.jobPhoto.create({
+      data: { jobId, url: blob.url, uploadedById: user.id },
+    });
+  } catch (err) {
+    console.error("uploadJobPhoto failed", err);
+    return { error: `Upload failed: ${(err as Error).message}` };
+  }
 
   revalidatePath(`/jobs/${jobId}`);
 }
