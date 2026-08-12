@@ -1,10 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { upload } from "@vercel/blob/client";
 import Image from "next/image";
 
-import { addJobPhoto, deleteJobPhoto } from "@/lib/actions/job-photos";
+import { uploadJobPhoto, deleteJobPhoto } from "@/lib/actions/job-photos";
 import { Button } from "@/components/ui/button";
 import type { JobPhoto } from "@prisma/client";
 
@@ -28,11 +27,13 @@ export function JobPhotos({
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
-        const blob = await upload(file.name, file, {
-          access: "public",
-          handleUploadUrl: "/api/job-photos/upload",
-        });
-        await addJobPhoto(jobId, blob.url);
+        const formData = new FormData();
+        formData.set("file", file);
+        const result = await uploadJobPhoto(jobId, formData);
+        if (result?.error) {
+          setError(result.error);
+          break;
+        }
       }
     } catch {
       setError("Couldn't upload photo. Try again.");
