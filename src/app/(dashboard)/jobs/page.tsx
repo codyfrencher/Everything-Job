@@ -2,7 +2,9 @@ import Link from "next/link";
 
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
+import { deleteJob } from "@/lib/actions/jobs";
 import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/delete-button";
 import { JobStatusBadge, statusLabels } from "@/components/job-status-badge";
 import {
   Card,
@@ -27,6 +29,7 @@ export default async function JobsPage({
   const { status, techId } = await searchParams;
 
   const isTech = user.role === "TECH";
+  const canManage = user.role === "ADMIN" || user.role === "DISPATCHER";
   const techs = isTech
     ? []
     : await db.user.findMany({
@@ -97,12 +100,13 @@ export default async function JobsPage({
                 <TableHead>Scheduled</TableHead>
                 <TableHead>Tech</TableHead>
                 <TableHead>Status</TableHead>
+                {canManage && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {jobs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={canManage ? 6 : 5} className="text-center text-muted-foreground">
                     No jobs found.
                   </TableCell>
                 </TableRow>
@@ -133,6 +137,20 @@ export default async function JobsPage({
                     <TableCell>
                       <JobStatusBadge status={job.status} />
                     </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/jobs/${job.id}`}>Edit</Link>
+                          </Button>
+                          <DeleteButton
+                            action={deleteJob.bind(null, job.id)}
+                            label="Delete"
+                            confirmMessage={`Delete "${job.title}"? This can't be undone.`}
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
