@@ -1,0 +1,8 @@
+name: Claude Code Action Official
+on: [push, pull_request]
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
