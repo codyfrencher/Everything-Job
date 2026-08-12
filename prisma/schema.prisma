@@ -35,6 +35,7 @@ model User {
 
   jobsAssigned    Job[]      @relation("JobAssignee")
   customersCreated Customer[] @relation("CustomerCreatedBy")
+  jobPhotosUploaded JobPhoto[] @relation("JobPhotoUploadedBy")
 }
 
 model Customer {
@@ -82,7 +83,23 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  photos JobPhoto[]
+
   @@index([status])
   @@index([scheduledStart])
   @@index([assignedToId])
+}
+
+model JobPhoto {
+  id        String   @id @default(cuid())
+  url       String
+  createdAt DateTime @default(now())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  uploadedById String?
+  uploadedBy   User?   @relation("JobPhotoUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([jobId])
 }
