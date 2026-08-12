@@ -1,1 +1,24 @@
+name: Claude automated PR review
 
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Claude automated review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Review this PR for correctness, security, and test gaps. Provide a high-level summary, list of potential issues, and recommended action items."
+          claude_args: "--model claude-sonnet-4-6"
