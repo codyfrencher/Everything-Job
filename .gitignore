@@ -41,3 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 package-lock.json
+
+# Prisma CLI agent-skill docs (installed by `prisma init`, not app code)
+/.agents/
+/.claude/
+/.windsurf/
+/skills-lock.json
