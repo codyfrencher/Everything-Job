@@ -52,6 +52,11 @@ model Customer {
   createdAt  DateTime  @default(now())
   archivedAt DateTime?
 
+  // Set when this customer originated from an external CRM (e.g. a
+  // LeadConnector contact ID) so repeat webhook deliveries update the
+  // same customer instead of creating duplicates.
+  externalId String? @unique
+
   createdById String?
   createdBy   User?   @relation("CustomerCreatedBy", fields: [createdById], references: [id])
 
