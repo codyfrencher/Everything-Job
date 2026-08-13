@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { updateJobStatus } from "@/lib/actions/jobs";
 import { statusLabels } from "@/components/job-status-badge";
@@ -23,30 +23,45 @@ export function JobStatusSelect({
   status: JobStatus;
   className?: string;
 }) {
+  const [value, setValue] = useState(status);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  return (
-    <Select
-      defaultValue={status}
-      onValueChange={(value) =>
-        startTransition(() => {
-          updateJobStatus(jobId, value as JobStatus);
-        })
+  function handleChange(next: JobStatus) {
+    const previous = value;
+    setValue(next);
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateJobStatus(jobId, next);
+      } catch (err) {
+        setValue(previous);
+        setError(err instanceof Error ? err.message : "Could not update status");
       }
-    >
-      <SelectTrigger
-        size="sm"
-        className={cn("text-xs", isPending && "opacity-60", className)}
+    });
+  }
+
+  return (
+    <div className={className}>
+      <Select
+        value={value}
+        onValueChange={(next) => handleChange(next as JobStatus)}
       >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {Object.entries(statusLabels).map(([value, label]) => (
-          <SelectItem key={value} value={value}>
-            {label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        <SelectTrigger
+          size="sm"
+          className={cn("w-full text-xs", isPending && "opacity-60")}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(statusLabels).map(([v, label]) => (
+            <SelectItem key={v} value={v}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
+    </div>
   );
 }

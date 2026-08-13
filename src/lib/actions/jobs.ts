@@ -7,7 +7,12 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/require-user";
 import { notifyUser } from "@/lib/push";
-import { jobSchema } from "@/lib/validators";
+import { jobSchema, techJobUpdateSchema } from "@/lib/validators";
+import {
+  assertNoOverlap,
+  assertValidJobState,
+  assertValidTimeRange,
+} from "@/lib/job-rules";
 import type { JobStatus } from "@prisma/client";
 
 export type FormState = { error?: string } | undefined;
@@ -47,6 +52,15 @@ function toJobData(data: ReturnType<typeof parseJobForm>) {
   };
 }
 
+async function assertAssignableTech(userId: string | null) {
+  if (!userId) return null;
+  const target = await db.user.findUnique({ where: { id: userId } });
+  if (!target || target.role !== "TECH") {
+    return "Jobs can only be assigned to a Tech";
+  }
+  return null;
+}
+
 export async function createJob(
   _prevState: FormState,
   formData: FormData,
@@ -56,7 +70,28 @@ export async function createJob(
   let job;
   try {
     const data = parseJobForm(formData);
-    job = await db.job.create({ data: toJobData(data) });
+    const jobData = toJobData(data);
+
+    const assignableError = await assertAssignableTech(jobData.assignedToId);
+    if (assignableError) return { error: assignableError };
+
+    const timeError = assertValidTimeRange(
+      jobData.scheduledStart,
+      jobData.scheduledEnd,
+    );
+    if (timeError) return { error: timeError };
+
+    const stateError = assertValidJobState(jobData);
+    if (stateError) return { error: stateError };
+
+    const overlapError = await assertNoOverlap({
+      assignedToId: jobData.assignedToId,
+      scheduledStart: jobData.scheduledStart,
+      scheduledEnd: jobData.scheduledEnd,
+    });
+    if (overlapError) return { error: overlapError };
+
+    job = await db.job.create({ data: jobData });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return { error: err.issues[0]?.message ?? "Invalid job details" };
@@ -87,19 +122,67 @@ export async function updateJob(
   let newlyAssignedToId: string | null = null;
 
   try {
-    const data = parseJobForm(formData);
     const existing = await db.job.findUnique({ where: { id: jobId } });
     if (!existing) {
       return { error: "Job not found" };
     }
-    if (user.role === "TECH" && existing.assignedToId !== user.id) {
+
+    const isTech = user.role === "TECH";
+    if (isTech && existing.assignedToId !== user.id) {
       return { error: "Not authorized" };
     }
 
-    const jobData = toJobData(data);
-    if (jobData.assignedToId && jobData.assignedToId !== existing.assignedToId) {
-      newlyAssignedToId = jobData.assignedToId;
+    // Techs may only change status and notes — parsed with a schema that
+    // doesn't even accept the other fields, regardless of what the form
+    // submitted. Everyone else uses the full job schema.
+    let jobData: ReturnType<typeof toJobData>;
+    if (isTech) {
+      const data = techJobUpdateSchema.parse({
+        status: formData.get("status"),
+        notes: formData.get("notes"),
+      });
+      jobData = {
+        title: existing.title,
+        description: existing.description,
+        customerId: existing.customerId,
+        assignedToId: existing.assignedToId,
+        status: data.status,
+        scheduledStart: existing.scheduledStart,
+        scheduledEnd: existing.scheduledEnd,
+        street: existing.street,
+        city: existing.city,
+        state: existing.state,
+        zip: existing.zip,
+        notes: data.notes || null,
+      };
+    } else {
+      const data = parseJobForm(formData);
+      jobData = toJobData(data);
+
+      const assignableError = await assertAssignableTech(jobData.assignedToId);
+      if (assignableError) return { error: assignableError };
+
+      if (jobData.assignedToId && jobData.assignedToId !== existing.assignedToId) {
+        newlyAssignedToId = jobData.assignedToId;
+      }
     }
+
+    const timeError = assertValidTimeRange(
+      jobData.scheduledStart,
+      jobData.scheduledEnd,
+    );
+    if (timeError) return { error: timeError };
+
+    const stateError = assertValidJobState(jobData);
+    if (stateError) return { error: stateError };
+
+    const overlapError = await assertNoOverlap({
+      jobId,
+      assignedToId: jobData.assignedToId,
+      scheduledStart: jobData.scheduledStart,
+      scheduledEnd: jobData.scheduledEnd,
+    });
+    if (overlapError) return { error: overlapError };
 
     await db.job.update({ where: { id: jobId }, data: jobData });
   } catch (err) {
@@ -129,12 +212,19 @@ export async function updateJob(
 export async function updateJobStatus(jobId: string, status: JobStatus) {
   const user = await requireUser();
 
-  if (user.role === "TECH") {
-    const existing = await db.job.findUnique({ where: { id: jobId } });
-    if (!existing || existing.assignedToId !== user.id) {
-      throw new Error("Not authorized");
-    }
+  const existing = await db.job.findUnique({ where: { id: jobId } });
+  if (!existing) throw new Error("Job not found");
+
+  if (user.role === "TECH" && existing.assignedToId !== user.id) {
+    throw new Error("Not authorized");
   }
+
+  const stateError = assertValidJobState({
+    status,
+    assignedToId: existing.assignedToId,
+    scheduledStart: existing.scheduledStart,
+  });
+  if (stateError) throw new Error(stateError);
 
   await db.job.update({ where: { id: jobId }, data: { status } });
 
@@ -146,17 +236,40 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
 
 export async function assignJob(jobId: string, assignedToId: string | null) {
   await requireRole("ADMIN", "DISPATCHER");
+
+  const assignableError = await assertAssignableTech(assignedToId);
+  if (assignableError) throw new Error(assignableError);
+
   const existing = await db.job.findUnique({ where: { id: jobId } });
+  if (!existing) throw new Error("Job not found");
+
+  const overlapError = await assertNoOverlap({
+    jobId,
+    assignedToId,
+    scheduledStart: existing.scheduledStart,
+    scheduledEnd: existing.scheduledEnd,
+  });
+  if (overlapError) throw new Error(overlapError);
+
+  // Only promote UNSCHEDULED -> SCHEDULED when there's already a time set.
+  // Never force a status the job's actual data doesn't support (see
+  // assertValidJobState) — this is also what keeps an assigned-but-untimed
+  // job correctly bucketed under "Unscheduled" on the dispatch board.
+  let nextStatus = existing.status;
+  if (!assignedToId) {
+    if (existing.status === "SCHEDULED" || existing.status === "IN_PROGRESS" || existing.status === "COMPLETED") {
+      nextStatus = "UNSCHEDULED";
+    }
+  } else if (existing.scheduledStart && existing.status === "UNSCHEDULED") {
+    nextStatus = "SCHEDULED";
+  }
 
   const job = await db.job.update({
     where: { id: jobId },
-    data: {
-      assignedToId,
-      status: assignedToId ? "SCHEDULED" : "UNSCHEDULED",
-    },
+    data: { assignedToId, status: nextStatus },
   });
 
-  if (assignedToId && assignedToId !== existing?.assignedToId) {
+  if (assignedToId && assignedToId !== existing.assignedToId) {
     await notifyUser(assignedToId, {
       title: "New job assigned",
       body: job.title,
