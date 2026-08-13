@@ -105,6 +105,17 @@ model JobPhoto {
   @@index([jobId])
 }
 
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
+
 model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique
