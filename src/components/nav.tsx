@@ -13,6 +13,7 @@ const links: { href: string; label: string; roles: Role[] }[] = [
   { href: "/jobs", label: "Jobs", roles: ["ADMIN", "DISPATCHER", "TECH"] },
   { href: "/customers", label: "Customers", roles: ["ADMIN", "DISPATCHER"] },
   { href: "/team", label: "Team", roles: ["ADMIN"] },
+  { href: "/audit", label: "Audit log", roles: ["ADMIN"] },
 ];
 
 export async function Nav() {

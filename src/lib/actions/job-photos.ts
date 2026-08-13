@@ -45,7 +45,7 @@ export async function uploadJobPhoto(jobId: string, formData: FormData) {
     });
   } catch (err) {
     console.error("uploadJobPhoto failed", err);
-    return { error: `Upload failed: ${(err as Error).message}` };
+    return { error: "Upload failed. Please try again." };
   }
 
   revalidatePath(`/jobs/${jobId}`);

@@ -3,10 +3,15 @@ import { notFound } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/require-user";
-import { updateCustomer, deleteCustomer } from "@/lib/actions/customers";
+import {
+  updateCustomer,
+  archiveCustomer,
+  restoreCustomer,
+} from "@/lib/actions/customers";
 import { CustomerForm } from "@/components/customer-form";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { DeleteButton } from "@/components/delete-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -31,21 +36,34 @@ export default async function CustomerDetailPage({
   if (!customer) notFound();
 
   const updateCustomerWithId = updateCustomer.bind(null, customer.id);
-  const deleteCustomerWithId = deleteCustomer.bind(null, customer.id);
+  const archiveCustomerWithId = archiveCustomer.bind(null, customer.id);
+  const restoreCustomerWithId = restoreCustomer.bind(null, customer.id);
+  const isArchived = customer.archivedAt !== null;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{customer.name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">{customer.name}</h1>
+          {isArchived && <Badge variant="secondary">Archived</Badge>}
+        </div>
         <div className="flex gap-2">
           <Button asChild>
             <Link href={`/jobs/new?customerId=${customer.id}`}>New job</Link>
           </Button>
-          <DeleteButton
-            action={deleteCustomerWithId}
-            label="Delete customer"
-            confirmMessage="Delete this customer and all of their jobs? This can't be undone."
-          />
+          {isArchived ? (
+            <form action={restoreCustomerWithId}>
+              <Button type="submit" variant="outline" size="sm">
+                Restore customer
+              </Button>
+            </form>
+          ) : (
+            <DeleteButton
+              action={archiveCustomerWithId}
+              label="Archive customer"
+              confirmMessage="Archive this customer? Their jobs and photos stay intact, and you can restore them later."
+            />
+          )}
         </div>
       </div>
 

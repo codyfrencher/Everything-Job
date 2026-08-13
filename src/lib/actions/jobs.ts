@@ -14,6 +14,7 @@ import {
   assertValidTimeRange,
 } from "@/lib/job-rules";
 import { parseZonedDateTime } from "@/lib/timezone";
+import { logJobAudit } from "@/lib/audit";
 import type { JobStatus } from "@prisma/client";
 
 export type FormState = { error?: string } | undefined;
@@ -70,7 +71,7 @@ export async function createJob(
   _prevState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireRole("ADMIN", "DISPATCHER");
+  const user = await requireRole("ADMIN", "DISPATCHER");
 
   let job;
   try {
@@ -103,6 +104,8 @@ export async function createJob(
     }
     return { error: "Could not create job" };
   }
+
+  await logJobAudit("created", job.id, user.id);
 
   if (job.assignedToId) {
     await notifyUser(job.assignedToId, {
@@ -197,6 +200,8 @@ export async function updateJob(
     return { error: "Could not update job" };
   }
 
+  await logJobAudit("edited", jobId, user.id);
+
   if (newlyAssignedToId) {
     const job = await db.job.findUnique({ where: { id: jobId } });
     if (job) {
@@ -233,6 +238,11 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
 
   await db.job.update({ where: { id: jobId }, data: { status } });
 
+  await logJobAudit("status_changed", jobId, user.id, {
+    from: existing.status,
+    to: status,
+  });
+
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/schedule");
@@ -240,7 +250,7 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
 }
 
 export async function assignJob(jobId: string, assignedToId: string | null) {
-  await requireRole("ADMIN", "DISPATCHER");
+  const user = await requireRole("ADMIN", "DISPATCHER");
 
   const assignableError = await assertAssignableTech(assignedToId);
   if (assignableError) throw new Error(assignableError);
@@ -274,6 +284,18 @@ export async function assignJob(jobId: string, assignedToId: string | null) {
     data: { assignedToId, status: nextStatus },
   });
 
+  if (assignedToId !== existing.assignedToId) {
+    const auditAction = !existing.assignedToId
+      ? "assigned"
+      : assignedToId
+        ? "reassigned"
+        : "unassigned";
+    await logJobAudit(auditAction, jobId, user.id, {
+      from: existing.assignedToId,
+      to: assignedToId,
+    });
+  }
+
   if (assignedToId && assignedToId !== existing.assignedToId) {
     await notifyUser(assignedToId, {
       title: "New job assigned",
@@ -289,7 +311,8 @@ export async function assignJob(jobId: string, assignedToId: string | null) {
 }
 
 export async function deleteJob(jobId: string) {
-  await requireRole("ADMIN", "DISPATCHER");
+  const user = await requireRole("ADMIN", "DISPATCHER");
+  await logJobAudit("deleted", jobId, user.id);
   await db.job.delete({ where: { id: jobId } });
   revalidatePath("/jobs");
   revalidatePath("/schedule");

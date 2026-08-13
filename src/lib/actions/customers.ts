@@ -67,9 +67,22 @@ export async function updateCustomer(
   revalidatePath(`/customers/${customerId}`);
 }
 
-export async function deleteCustomer(customerId: string) {
+export async function archiveCustomer(customerId: string) {
   await requireRole("ADMIN", "DISPATCHER");
-  await db.customer.delete({ where: { id: customerId } });
+  await db.customer.update({
+    where: { id: customerId },
+    data: { archivedAt: new Date() },
+  });
   revalidatePath("/customers");
   redirect("/customers");
+}
+
+export async function restoreCustomer(customerId: string) {
+  await requireRole("ADMIN", "DISPATCHER");
+  await db.customer.update({
+    where: { id: customerId },
+    data: { archivedAt: null },
+  });
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${customerId}`);
 }

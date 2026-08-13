@@ -20,21 +20,25 @@ import {
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; archived?: string }>;
 }) {
   await requireRole("ADMIN", "DISPATCHER");
-  const { q } = await searchParams;
+  const { q, archived } = await searchParams;
+  const showArchived = archived === "1";
 
   const customers = await db.customer.findMany({
-    where: q
-      ? {
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { email: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+    where: {
+      archivedAt: showArchived ? { not: null } : null,
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { email: { contains: q, mode: "insensitive" } },
+              { phone: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
     include: { _count: { select: { jobs: true } } },
     orderBy: { name: "asc" },
   });
@@ -42,23 +46,33 @@ export default async function CustomersPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Customers</h1>
+        <h1 className="text-2xl font-semibold">
+          {showArchived ? "Archived customers" : "Customers"}
+        </h1>
         <Button asChild>
           <Link href="/customers/new">New customer</Link>
         </Button>
       </div>
 
-      <form className="flex gap-2">
-        <Input
-          name="q"
-          placeholder="Search by name, email, or phone"
-          defaultValue={q ?? ""}
-          className="max-w-sm"
-        />
-        <Button type="submit" variant="secondary">
-          Search
+      <div className="flex flex-wrap items-center gap-2">
+        <form className="flex gap-2">
+          {showArchived && <input type="hidden" name="archived" value="1" />}
+          <Input
+            name="q"
+            placeholder="Search by name, email, or phone"
+            defaultValue={q ?? ""}
+            className="max-w-sm"
+          />
+          <Button type="submit" variant="secondary">
+            Search
+          </Button>
+        </form>
+        <Button asChild variant="outline" size="sm">
+          <Link href={showArchived ? "/customers" : "/customers?archived=1"}>
+            {showArchived ? "Show active" : "Show archived"}
+          </Link>
         </Button>
-      </form>
+      </div>
 
       {customers.length === 0 ? (
         <Card>
