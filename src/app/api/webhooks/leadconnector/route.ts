@@ -46,8 +46,19 @@ export async function POST(request: Request) {
   let data;
   try {
     data = payloadSchema.parse(await request.json());
-  } catch {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issue = err.issues[0];
+      return NextResponse.json(
+        {
+          error: issue
+            ? `Invalid payload: "${issue.path.join(".")}" — ${issue.message}`
+            : "Invalid payload",
+        },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ error: "Invalid payload: not valid JSON" }, { status: 400 });
   }
 
   const scheduledStart = data.scheduledStart ? new Date(data.scheduledStart) : null;
