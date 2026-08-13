@@ -3,8 +3,9 @@
 import { useTransition } from "react";
 import Link from "next/link";
 
-import { assignJob, updateJobStatus } from "@/lib/actions/jobs";
-import { JobStatusBadge, statusLabels } from "@/components/job-status-badge";
+import { assignJob } from "@/lib/actions/jobs";
+import { JobStatusBadge } from "@/components/job-status-badge";
+import { JobStatusSelect } from "@/components/job-status-select";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Job, JobStatus, User } from "@prisma/client";
+import type { Job, User } from "@prisma/client";
 
 export function JobDispatchCard({
   job,
@@ -79,25 +80,11 @@ export function JobDispatchCard({
             ) : null}
 
             {canUpdateStatus ? (
-              <Select
-                defaultValue={job.status}
-                onValueChange={(value) =>
-                  startTransition(() => {
-                    updateJobStatus(job.id, value as JobStatus);
-                  })
-                }
-              >
-                <SelectTrigger size="sm" className="flex-1 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <JobStatusSelect
+                jobId={job.id}
+                status={job.status}
+                className="flex-1"
+              />
             ) : null}
           </div>
         ) : null}
