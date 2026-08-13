@@ -39,13 +39,19 @@ function isAuthorized(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
+  // Logged unconditionally (before auth/validation) while wiring up the
+  // LeadConnector integration, so a misbehaving workflow step is
+  // diagnosable from Vercel's function logs regardless of where it fails.
+  const rawText = await request.text();
+  console.log("leadconnector webhook received:", rawText);
+
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let rawBody: unknown;
   try {
-    rawBody = await request.json();
+    rawBody = JSON.parse(rawText);
   } catch {
     return NextResponse.json({ error: "Invalid payload: not valid JSON" }, { status: 400 });
   }
