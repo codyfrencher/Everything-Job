@@ -43,23 +43,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let data;
+  let rawBody: unknown;
   try {
-    data = payloadSchema.parse(await request.json());
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      const issue = err.issues[0];
-      return NextResponse.json(
-        {
-          error: issue
-            ? `Invalid payload: "${issue.path.join(".")}" — ${issue.message}`
-            : "Invalid payload",
-        },
-        { status: 400 },
-      );
-    }
+    rawBody = await request.json();
+  } catch {
     return NextResponse.json({ error: "Invalid payload: not valid JSON" }, { status: 400 });
   }
+
+  const parsed = payloadSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    // Echoes the caller's own submitted body back alongside the error —
+    // only reachable with a valid secret already, and it's the fastest
+    // way to see exactly what a misconfigured webhook step actually sent
+    // without needing separate server log access.
+    return NextResponse.json(
+      {
+        error: issue
+          ? `Invalid payload: "${issue.path.join(".")}" — ${issue.message}`
+          : "Invalid payload",
+        received: rawBody,
+      },
+      { status: 400 },
+    );
+  }
+  const data = parsed.data;
 
   const scheduledStart = data.scheduledStart ? new Date(data.scheduledStart) : null;
   const scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
