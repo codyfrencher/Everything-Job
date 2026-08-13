@@ -16,8 +16,8 @@ export function assertValidJobState(job: {
   assignedToId: string | null;
   scheduledStart: Date | null;
 }): string | null {
-  if (job.status === "SCHEDULED" && (!job.scheduledStart || !job.assignedToId)) {
-    return "A scheduled job needs both a scheduled time and an assigned tech";
+  if (job.status === "SCHEDULED" && !job.scheduledStart) {
+    return "A scheduled job needs a scheduled time";
   }
   if (
     (job.status === "IN_PROGRESS" || job.status === "COMPLETED") &&

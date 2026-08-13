@@ -54,6 +54,7 @@ export default async function SchedulePage({
   });
 
   const unscheduled = jobs.filter((j) => !j.scheduledStart);
+  const needsTech = jobs.filter((j) => j.scheduledStart && !j.assignedToId);
   const jobsByTech = new Map<string, typeof jobs>();
   for (const tech of techs) {
     jobsByTech.set(
@@ -79,7 +80,7 @@ export default async function SchedulePage({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">
             Unscheduled
@@ -100,6 +101,29 @@ export default async function SchedulePage({
             )}
           </div>
         </div>
+
+        {!isTech && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground">
+              Needs a tech
+            </h2>
+            <div className="space-y-2">
+              {needsTech.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nothing waiting on a tech.</p>
+              ) : (
+                needsTech.map((job) => (
+                  <JobDispatchCard
+                    key={job.id}
+                    job={job}
+                    techs={techs}
+                    canAssign={canManage}
+                    canUpdateStatus={canManage}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {techs.map((tech) => (
           <div key={tech.id} className="space-y-3">

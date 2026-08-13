@@ -266,14 +266,16 @@ export async function assignJob(jobId: string, assignedToId: string | null) {
   });
   if (overlapError) throw new Error(overlapError);
 
-  // Only promote UNSCHEDULED -> SCHEDULED when there's already a time set.
-  // Never force a status the job's actual data doesn't support (see
-  // assertValidJobState) — this is also what keeps an assigned-but-untimed
-  // job correctly bucketed under "Unscheduled" on the dispatch board.
+  // Promote UNSCHEDULED -> SCHEDULED when there's already a time set.
+  // A SCHEDULED job no longer needs a tech (see assertValidJobState — a
+  // job can be booked with a time before staffing is decided, e.g. a
+  // LeadConnector appointment), but IN_PROGRESS/COMPLETED still do, so
+  // unassigning one of those steps it back down to whatever its time
+  // alone supports.
   let nextStatus = existing.status;
   if (!assignedToId) {
-    if (existing.status === "SCHEDULED" || existing.status === "IN_PROGRESS" || existing.status === "COMPLETED") {
-      nextStatus = "UNSCHEDULED";
+    if (existing.status === "IN_PROGRESS" || existing.status === "COMPLETED") {
+      nextStatus = existing.scheduledStart ? "SCHEDULED" : "UNSCHEDULED";
     }
   } else if (existing.scheduledStart && existing.status === "UNSCHEDULED") {
     nextStatus = "SCHEDULED";
