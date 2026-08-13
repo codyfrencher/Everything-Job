@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { assignJob } from "@/lib/actions/jobs";
 import { directionsUrl } from "@/lib/maps";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { JobStatusSelect } from "@/components/job-status-select";
 import {
@@ -59,15 +61,9 @@ export function JobDispatchCard({
         <p className="text-sm text-muted-foreground">{job.customer.name}</p>
         {job.scheduledStart ? (
           <p className="text-xs text-muted-foreground">
-            {job.scheduledStart.toLocaleTimeString([], {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
+            {formatInTimeZone(job.scheduledStart, COMPANY_TIME_ZONE, "h:mm a")}
             {job.scheduledEnd
-              ? ` – ${job.scheduledEnd.toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}`
+              ? ` – ${formatInTimeZone(job.scheduledEnd, COMPANY_TIME_ZONE, "h:mm a")}`
               : ""}
           </p>
         ) : null}

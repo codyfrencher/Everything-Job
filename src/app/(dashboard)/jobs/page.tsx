@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
@@ -18,7 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 import type { JobStatus } from "@prisma/client";
+
+function formatSchedule(date: Date) {
+  return formatInTimeZone(date, COMPANY_TIME_ZONE, "MMM d, h:mm a");
+}
 
 export default async function JobsPage({
   searchParams,
@@ -115,12 +121,7 @@ export default async function JobsPage({
                   <p className="text-sm text-muted-foreground">{job.customer.name}</p>
                   <p className="text-sm text-muted-foreground">
                     {job.scheduledStart
-                      ? job.scheduledStart.toLocaleString([], {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })
+                      ? formatSchedule(job.scheduledStart)
                       : "Not scheduled"}
                     {" · "}
                     {job.assignedTo?.name ?? "Unassigned"}
@@ -169,12 +170,7 @@ export default async function JobsPage({
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {job.scheduledStart
-                          ? job.scheduledStart.toLocaleString([], {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })
+                          ? formatSchedule(job.scheduledStart)
                           : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">

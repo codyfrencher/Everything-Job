@@ -1,21 +1,22 @@
 import Link from "next/link";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 import { JobDispatchCard } from "@/components/job-dispatch-card";
 import { Button } from "@/components/ui/button";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 
-function parseDate(value: string | undefined) {
-  if (!value) return new Date();
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return new Date();
-  return new Date(y, m - 1, d);
+function parseDateParam(value: string | undefined) {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return formatInTimeZone(new Date(), COMPANY_TIME_ZONE, "yyyy-MM-dd");
 }
 
-function toDateParam(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+function shiftDateParam(dateStr: string, days: number) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export default async function SchedulePage({
@@ -28,16 +29,12 @@ export default async function SchedulePage({
   const isTech = user.role === "TECH";
   const canManage = user.role === "ADMIN" || user.role === "DISPATCHER";
 
-  const date = parseDate(dateParam);
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const dateStr = parseDateParam(dateParam);
+  const dayStart = fromZonedTime(`${dateStr}T00:00:00`, COMPANY_TIME_ZONE);
+  const dayEnd = fromZonedTime(`${dateStr}T23:59:59.999`, COMPANY_TIME_ZONE);
 
-  const prevDate = new Date(date);
-  prevDate.setDate(prevDate.getDate() - 1);
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + 1);
+  const prevDateStr = shiftDateParam(dateStr, -1);
+  const nextDateStr = shiftDateParam(dateStr, 1);
 
   const techs = await db.user.findMany({
     where: { role: "TECH", ...(isTech ? { id: user.id } : {}) },
@@ -71,21 +68,13 @@ export default async function SchedulePage({
         <h1 className="text-2xl font-semibold">Schedule</h1>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/schedule?date=${toDateParam(prevDate)}`}>
-              ← Previous day
-            </Link>
+            <Link href={`/schedule?date=${prevDateStr}`}>← Previous day</Link>
           </Button>
           <span className="min-w-36 text-center text-sm font-medium">
-            {date.toLocaleDateString([], {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
+            {formatInTimeZone(dayStart, COMPANY_TIME_ZONE, "EEEE, MMM d")}
           </span>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/schedule?date=${toDateParam(nextDate)}`}>
-              Next day →
-            </Link>
+            <Link href={`/schedule?date=${nextDateStr}`}>Next day →</Link>
           </Button>
         </div>
       </div>
