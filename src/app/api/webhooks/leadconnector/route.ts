@@ -56,7 +56,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload: not valid JSON" }, { status: 400 });
   }
 
-  const parsed = payloadSchema.safeParse(rawBody);
+  // LeadConnector nests everything configured in a workflow's Webhook
+  // action "Custom Data" section under a top-level customData object,
+  // alongside its own standard contact/appointment fields — it's not a
+  // flat body. Fall back to the raw body itself so a differently-shaped
+  // caller (or a future LeadConnector change) still has a chance to work.
+  const customData =
+    rawBody && typeof rawBody === "object" && "customData" in rawBody
+      ? (rawBody as { customData: unknown }).customData
+      : rawBody;
+
+  const parsed = payloadSchema.safeParse(customData);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     // Echoes the caller's own submitted body back alongside the error —
@@ -68,7 +78,7 @@ export async function POST(request: Request) {
         error: issue
           ? `Invalid payload: "${issue.path.join(".")}" — ${issue.message}`
           : "Invalid payload",
-        received: rawBody,
+        received: customData,
       },
       { status: 400 },
     );
