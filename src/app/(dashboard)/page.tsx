@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { JobStatusBadge } from "@/components/job-status-badge";
+import { JobStatusSelect } from "@/components/job-status-select";
 import type { JobStatus } from "@prisma/client";
 
 const STATUS_ORDER: JobStatus[] = [
@@ -23,6 +24,8 @@ export default async function DashboardPage() {
   const session = await auth();
   const user = session!.user;
   const isTech = user.role === "TECH";
+  const canUpdateStatus = (job: { assignedToId: string | null }) =>
+    !isTech || job.assignedToId === user.id;
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -68,18 +71,20 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {STATUS_ORDER.map((status) => (
-          <Card key={status}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                <JobStatusBadge status={status} />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold">
-                {countByStatus[status] ?? 0}
-              </p>
-            </CardContent>
-          </Card>
+          <Link key={status} href={`/jobs?status=${status}`}>
+            <Card className="transition-colors hover:border-foreground/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <JobStatusBadge status={status} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-semibold">
+                  {countByStatus[status] ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
@@ -118,7 +123,11 @@ export default async function DashboardPage() {
                         : ""}
                     </p>
                   </div>
-                  <JobStatusBadge status={job.status} />
+                  {canUpdateStatus(job) ? (
+                    <JobStatusSelect jobId={job.id} status={job.status} />
+                  ) : (
+                    <JobStatusBadge status={job.status} />
+                  )}
                 </li>
               ))}
             </ul>
