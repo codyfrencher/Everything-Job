@@ -36,6 +36,7 @@ model User {
   jobsAssigned    Job[]      @relation("JobAssignee")
   customersCreated Customer[] @relation("CustomerCreatedBy")
   jobPhotosUploaded JobPhoto[] @relation("JobPhotoUploadedBy")
+  pushSubscriptions PushSubscription[]
 }
 
 model Customer {
@@ -102,4 +103,17 @@ model JobPhoto {
   uploadedBy   User?   @relation("JobPhotoUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([jobId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

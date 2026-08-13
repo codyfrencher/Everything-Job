@@ -10,13 +10,17 @@ A Housecall-Pro-inspired scheduling, dispatch, and job/customer management app, 
 - Tailwind CSS + [shadcn/ui](https://ui.shadcn.com)
 - [Zod](https://zod.dev) for validation
 
-## v1 features
+## Features
 
 - **Scheduling & dispatch** — a day-view board with a column per tech, reassign and change job status inline
 - **Job & customer management** — customer records with address/notes, job history, job creation/editing with status tracking
+- **Photo attachments** — attach photos to a job from any device, including straight from a phone camera
+- **Push notifications** — a tech gets notified when a job is assigned to them (requires granting notification permission; on iPhone, the site must be added to the Home Screen first — see "Push notifications" below)
+- An interactive dashboard — clickable status counts, inline status updates
 - Role-based access: Admins and Dispatchers manage customers/jobs/team; Techs see and update only jobs assigned to them
+- Mobile-friendly — nav and list views adapt to phone screens
 
-Not in v1 (see "Follow-ups" below): estimates/invoicing, online payments, drag-and-drop scheduling, photo attachments.
+Not yet built (see "Follow-ups" below): estimates/invoicing, online payments, drag-and-drop scheduling.
 
 ## Getting started
 
@@ -65,6 +69,22 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000) and sign in with one of the seeded accounts.
 
+## Push notifications
+
+Push requires two environment variables — generate them once with:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Then set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (locally in `.env`, and in your host's environment variables for production). Without these set, the "Enable notifications" button in the nav won't appear.
+
+A tech taps "Enable notifications" once per device to opt in. On iPhone, Apple only allows push notifications from an installed web app, not a regular Safari tab — the tech needs to add the site to their Home Screen first (Share → Add to Home Screen), then open it from there before enabling notifications.
+
+## Photo attachments
+
+Job photos are stored in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob). Create a **Public** access Blob store (Vercel dashboard → Storage → Create Database → Blob), connect it to the project, and make sure `BLOB_READ_WRITE_TOKEN` ends up in your environment variables — see the store's "Manage Blobs" → `.env.local` tab if you need to copy it manually.
+
 ## Project structure
 
 ```
@@ -93,9 +113,8 @@ src/
 
 Point `DATABASE_URL` at a real Postgres instance (e.g. a managed Postgres provider), set a strong `AUTH_SECRET`, run `npx prisma migrate deploy`, then build and start the app (`npm run build && npm run start`) on your host of choice.
 
-## Follow-ups (out of scope for v1)
+## Follow-ups (not yet built)
 
 - Estimates and invoicing, online payments
 - Drag-and-drop on the dispatch board
-- Photo attachments on jobs
-- Native mobile app / push notifications for techs
+- Native mobile app

@@ -15,11 +15,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Fieldwork",
   description: "Scheduling, dispatch, and job management for the team.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Fieldwork",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#111111",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
