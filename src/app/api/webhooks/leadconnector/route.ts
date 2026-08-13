@@ -2,30 +2,58 @@ import { timingSafeEqual } from "crypto";
 
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { format, parse } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { logJobAudit } from "@/lib/audit";
 import { assertValidTimeRange } from "@/lib/job-rules";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 
 const payloadSchema = z.object({
   contactId: z.string().min(1),
   name: z.string().min(1),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  street: z.string().optional().or(z.literal("")),
-  city: z.string().optional().or(z.literal("")),
-  state: z.string().optional().or(z.literal("")),
-  zip: z.string().optional().or(z.literal("")),
-  jobTitle: z.string().optional().or(z.literal("")),
-  jobDescription: z.string().optional().or(z.literal("")),
-  // Full ISO 8601 datetime strings (with an offset or "Z"), e.g. what
-  // LeadConnector's appointment merge fields render as. A naive
-  // "local" string with no offset would be ambiguous here since this
-  // is a server-to-server call with no browser timezone to infer from.
-  scheduledStart: z.string().datetime({ offset: true }).optional().or(z.literal("")),
-  scheduledEnd: z.string().datetime({ offset: true }).optional().or(z.literal("")),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  street: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  jobTitle: z.string().optional(),
+  jobDescription: z.string().optional(),
+  scheduledStart: z.string().optional(),
+  scheduledEnd: z.string().optional(),
 });
+
+// LeadConnector renders an empty merge field as the literal text
+// "undefined" rather than an empty string, so that has to be treated
+// the same as "no value" alongside actually-blank strings.
+function cleanField(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || /^(undefined|null)$/i.test(trimmed)) return null;
+  return trimmed;
+}
+
+// LeadConnector's appointment start/end time merge fields render as a
+// human-readable string in the account's local (Eastern) time, e.g.
+// "Tuesday, August 18, 2026 9:00 AM" — not ISO 8601. Parse that shape
+// as an Eastern wall-clock time; fall back to native Date parsing for
+// anything already in a standard format.
+function parseLeadConnectorDate(value: string | undefined): Date | null {
+  const cleaned = cleanField(value);
+  if (!cleaned) return null;
+
+  const parsed = parse(cleaned, "EEEE, MMMM d, yyyy h:mm a", new Date());
+  if (!isNaN(parsed.getTime())) {
+    const isoLocal = format(parsed, "yyyy-MM-dd'T'HH:mm:ss");
+    return fromZonedTime(isoLocal, COMPANY_TIME_ZONE);
+  }
+
+  const fallback = new Date(cleaned);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
 
 function isAuthorized(request: Request): boolean {
   const expected = process.env.LEADCONNECTOR_WEBHOOK_SECRET;
@@ -85,8 +113,17 @@ export async function POST(request: Request) {
   }
   const data = parsed.data;
 
-  const scheduledStart = data.scheduledStart ? new Date(data.scheduledStart) : null;
-  const scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
+  const email = cleanField(data.email);
+  const phone = cleanField(data.phone);
+  const street = cleanField(data.street);
+  const city = cleanField(data.city);
+  const state = cleanField(data.state);
+  const zip = cleanField(data.zip);
+  const jobTitle = cleanField(data.jobTitle);
+  const jobDescription = cleanField(data.jobDescription);
+
+  const scheduledStart = parseLeadConnectorDate(data.scheduledStart);
+  const scheduledEnd = parseLeadConnectorDate(data.scheduledEnd);
 
   const timeError = assertValidTimeRange(scheduledStart, scheduledEnd);
   if (timeError) {
@@ -99,32 +136,32 @@ export async function POST(request: Request) {
       create: {
         externalId: data.contactId,
         name: data.name,
-        email: data.email || null,
-        phone: data.phone || null,
-        street: data.street || null,
-        city: data.city || null,
-        state: data.state || "FL",
-        zip: data.zip || null,
+        email,
+        phone,
+        street,
+        city,
+        state: state || "FL",
+        zip,
       },
       update: {
         name: data.name,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
+        email: email ?? undefined,
+        phone: phone ?? undefined,
       },
     });
 
     const job = await db.job.create({
       data: {
-        title: data.jobTitle || `New lead: ${data.name}`,
-        description: data.jobDescription || null,
+        title: jobTitle || `New lead: ${data.name}`,
+        description: jobDescription,
         customerId: customer.id,
         status: scheduledStart ? "SCHEDULED" : "UNSCHEDULED",
         scheduledStart,
         scheduledEnd,
-        street: data.street || customer.street,
-        city: data.city || customer.city,
-        state: data.state || customer.state || "FL",
-        zip: data.zip || customer.zip,
+        street: street || customer.street,
+        city: city || customer.city,
+        state: state || customer.state || "FL",
+        zip: zip || customer.zip,
       },
     });
 
