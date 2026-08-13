@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 
 import { assignJob } from "@/lib/actions/jobs";
+import { directionsUrl } from "@/lib/maps";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { JobStatusSelect } from "@/components/job-status-select";
 import {
@@ -28,6 +29,7 @@ export function JobDispatchCard({
   canUpdateStatus: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const directions = directionsUrl(job);
 
   return (
     <Card className={isPending ? "opacity-60" : undefined}>
@@ -52,6 +54,16 @@ export function JobDispatchCard({
                 })}`
               : ""}
           </p>
+        ) : null}
+        {directions ? (
+          <a
+            href={directions}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            Get directions
+          </a>
         ) : null}
 
         {canAssign || canUpdateStatus ? (
