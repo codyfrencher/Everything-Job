@@ -140,7 +140,7 @@ export function JobForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="state">State</Label>
-          <Input id="state" name="state" defaultValue={job?.state ?? ""} />
+          <Input id="state" name="state" defaultValue={job?.state ?? "FL"} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="zip">ZIP</Label>
