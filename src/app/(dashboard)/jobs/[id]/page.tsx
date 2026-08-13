@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 import { updateJob, deleteJob } from "@/lib/actions/jobs";
+import { directionsUrl } from "@/lib/maps";
 import { JobForm } from "@/components/job-form";
 import { JobPhotos } from "@/components/job-photos";
 import { DeleteButton } from "@/components/delete-button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function JobDetailPage({
@@ -35,18 +37,28 @@ export default async function JobDetailPage({
 
   const updateJobWithId = updateJob.bind(null, job.id);
   const deleteJobWithId = deleteJob.bind(null, job.id);
+  const directions = directionsUrl(job);
 
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{job.title}</h1>
-        {canManage && (
-          <DeleteButton
-            action={deleteJobWithId}
-            label="Delete job"
-            confirmMessage="Delete this job? This can't be undone."
-          />
-        )}
+        <div className="flex gap-2">
+          {directions && (
+            <Button asChild variant="outline" size="sm">
+              <a href={directions} target="_blank" rel="noreferrer">
+                Get directions
+              </a>
+            </Button>
+          )}
+          {canManage && (
+            <DeleteButton
+              action={deleteJobWithId}
+              label="Delete job"
+              confirmMessage="Delete this job? This can't be undone."
+            />
+          )}
+        </div>
       </div>
       <Card>
         <CardHeader>
