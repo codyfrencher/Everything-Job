@@ -40,16 +40,17 @@ model User {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  street    String?
-  city      String?
-  state     String?
-  zip       String?
-  notes     String?
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  name       String
+  email      String?
+  phone      String?
+  street     String?
+  city       String?
+  state      String?
+  zip        String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
 
   createdById String?
   createdBy   User?   @relation("CustomerCreatedBy", fields: [createdById], references: [id])
@@ -103,6 +104,18 @@ model JobPhoto {
   uploadedBy   User?   @relation("JobPhotoUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([jobId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  jobId     String?
+  actorId   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([createdAt])
 }
 
 model LoginAttempt {

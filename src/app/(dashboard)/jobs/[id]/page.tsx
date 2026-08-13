@@ -28,7 +28,10 @@ export default async function JobDetailPage({
   const canManage = user.role === "ADMIN" || user.role === "DISPATCHER";
 
   const [customers, techs] = await Promise.all([
-    db.customer.findMany({ orderBy: { name: "asc" } }),
+    db.customer.findMany({
+      where: { OR: [{ archivedAt: null }, { id: job.customerId }] },
+      orderBy: { name: "asc" },
+    }),
     db.user.findMany({
       where: { role: "TECH" },
       orderBy: { name: "asc" },

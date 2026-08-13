@@ -28,6 +28,6 @@ export async function subscribeToPush(subscription: SubscriptionInput) {
 }
 
 export async function unsubscribeFromPush(endpoint: string) {
-  await requireUser();
-  await db.pushSubscription.deleteMany({ where: { endpoint } });
+  const user = await requireUser();
+  await db.pushSubscription.deleteMany({ where: { endpoint, userId: user.id } });
 }
