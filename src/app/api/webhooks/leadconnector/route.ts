@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { logJobAudit } from "@/lib/audit";
+import { assertValidTimeRange } from "@/lib/job-rules";
 
 const payloadSchema = z.object({
   contactId: z.string().min(1),
@@ -18,6 +19,12 @@ const payloadSchema = z.object({
   zip: z.string().optional().or(z.literal("")),
   jobTitle: z.string().optional().or(z.literal("")),
   jobDescription: z.string().optional().or(z.literal("")),
+  // Full ISO 8601 datetime strings (with an offset or "Z"), e.g. what
+  // LeadConnector's appointment merge fields render as. A naive
+  // "local" string with no offset would be ambiguous here since this
+  // is a server-to-server call with no browser timezone to infer from.
+  scheduledStart: z.string().datetime({ offset: true }).optional().or(z.literal("")),
+  scheduledEnd: z.string().datetime({ offset: true }).optional().or(z.literal("")),
 });
 
 function isAuthorized(request: Request): boolean {
@@ -41,6 +48,14 @@ export async function POST(request: Request) {
     data = payloadSchema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const scheduledStart = data.scheduledStart ? new Date(data.scheduledStart) : null;
+  const scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
+
+  const timeError = assertValidTimeRange(scheduledStart, scheduledEnd);
+  if (timeError) {
+    return NextResponse.json({ error: timeError }, { status: 400 });
   }
 
   try {
@@ -68,7 +83,9 @@ export async function POST(request: Request) {
         title: data.jobTitle || `New lead: ${data.name}`,
         description: data.jobDescription || null,
         customerId: customer.id,
-        status: "UNSCHEDULED",
+        status: scheduledStart ? "SCHEDULED" : "UNSCHEDULED",
+        scheduledStart,
+        scheduledEnd,
         street: data.street || customer.street,
         city: data.city || customer.city,
         state: data.state || customer.state || "FL",
