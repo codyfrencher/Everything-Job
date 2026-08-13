@@ -60,49 +60,79 @@ export default async function CustomersPage({
         </Button>
       </form>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead className="text-right">Jobs</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    No customers found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                customers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <Link
-                        href={`/customers/${customer.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {customer.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {[customer.email, customer.phone].filter(Boolean).join(" · ") || "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {[customer.city, customer.state].filter(Boolean).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">{customer._count.jobs}</TableCell>
+      {customers.length === 0 ? (
+        <Card>
+          <CardContent className="text-center text-muted-foreground">
+            No customers found.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile: stacked cards */}
+          <div className="space-y-3 md:hidden">
+            {customers.map((customer) => (
+              <Card key={customer.id}>
+                <CardContent className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/customers/${customer.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {customer.name}
+                    </Link>
+                    <span className="text-sm text-muted-foreground">
+                      {customer._count.jobs} job{customer._count.jobs === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {[customer.email, customer.phone].filter(Boolean).join(" · ") || "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {[customer.city, customer.state].filter(Boolean).join(", ") || "—"}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <Card className="hidden md:block">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead className="text-right">Jobs</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {customers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>
+                        <Link
+                          href={`/customers/${customer.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {customer.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {[customer.email, customer.phone].filter(Boolean).join(" · ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {[customer.city, customer.state].filter(Boolean).join(", ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{customer._count.jobs}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
