@@ -16,13 +16,7 @@ import {
 import type { Customer, Job, User } from "@prisma/client";
 import type { FormState } from "@/lib/actions/jobs";
 import { statusLabels } from "@/components/job-status-badge";
-
-function toLocalInputValue(date: Date | null) {
-  if (!date) return "";
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60 * 1000);
-  return local.toISOString().slice(0, 16);
-}
+import { toDateTimeLocalValue } from "@/lib/timezone";
 
 export function JobForm({
   job,
@@ -126,7 +120,7 @@ export function JobForm({
             id="scheduledStart"
             name="scheduledStart"
             type="datetime-local"
-            defaultValue={toLocalInputValue(job?.scheduledStart ?? null)}
+            defaultValue={toDateTimeLocalValue(job?.scheduledStart ?? null)}
             disabled={readOnly}
           />
         </div>
@@ -136,7 +130,7 @@ export function JobForm({
             id="scheduledEnd"
             name="scheduledEnd"
             type="datetime-local"
-            defaultValue={toLocalInputValue(job?.scheduledEnd ?? null)}
+            defaultValue={toDateTimeLocalValue(job?.scheduledEnd ?? null)}
             disabled={readOnly}
           />
         </div>

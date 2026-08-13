@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { JobStatusSelect } from "@/components/job-status-select";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 import type { JobStatus } from "@prisma/client";
 
 const STATUS_ORDER: JobStatus[] = [
@@ -27,10 +29,9 @@ export default async function DashboardPage() {
   const canUpdateStatus = (job: { assignedToId: string | null }) =>
     !isTech || job.assignedToId === user.id;
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
+  const todayStr = formatInTimeZone(new Date(), COMPANY_TIME_ZONE, "yyyy-MM-dd");
+  const startOfDay = fromZonedTime(`${todayStr}T00:00:00`, COMPANY_TIME_ZONE);
+  const endOfDay = fromZonedTime(`${todayStr}T23:59:59.999`, COMPANY_TIME_ZONE);
 
   const [statusCounts, todaysJobs] = await Promise.all([
     db.job.groupBy({
@@ -116,10 +117,11 @@ export default async function DashboardPage() {
                       {job.customer.name}
                       {job.assignedTo ? ` · ${job.assignedTo.name}` : " · Unassigned"}
                       {job.scheduledStart
-                        ? ` · ${job.scheduledStart.toLocaleTimeString([], {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`
+                        ? ` · ${formatInTimeZone(
+                            job.scheduledStart,
+                            COMPANY_TIME_ZONE,
+                            "h:mm a",
+                          )}`
                         : ""}
                     </p>
                   </div>

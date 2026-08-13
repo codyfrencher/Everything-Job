@@ -13,6 +13,7 @@ import {
   assertValidJobState,
   assertValidTimeRange,
 } from "@/lib/job-rules";
+import { parseZonedDateTime } from "@/lib/timezone";
 import type { JobStatus } from "@prisma/client";
 
 export type FormState = { error?: string } | undefined;
@@ -42,8 +43,12 @@ function toJobData(data: ReturnType<typeof parseJobForm>) {
     customerId: data.customerId,
     assignedToId: data.assignedToId || null,
     status: data.status,
-    scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : null,
-    scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : null,
+    scheduledStart: data.scheduledStart
+      ? parseZonedDateTime(data.scheduledStart)
+      : null,
+    scheduledEnd: data.scheduledEnd
+      ? parseZonedDateTime(data.scheduledEnd)
+      : null,
     street: data.street || null,
     city: data.city || null,
     state: data.state || null,
