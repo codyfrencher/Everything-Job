@@ -1,0 +1,16 @@
+{
+  "name": "Fieldwork",
+  "short_name": "Fieldwork",
+  "description": "Scheduling, dispatch, and job management for the team.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

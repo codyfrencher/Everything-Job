@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { LogoutButton } from "@/components/logout-button";
 import { MobileNavMenu } from "@/components/mobile-nav-menu";
+import { NotificationToggle } from "@/components/notification-toggle";
 import { Badge } from "@/components/ui/badge";
 import type { Role } from "@prisma/client";
 
@@ -42,6 +43,7 @@ export async function Nav() {
         <div className="hidden items-center gap-3 md:flex">
           {session?.user ? (
             <>
+              <NotificationToggle />
               <div className="text-right text-sm leading-tight">
                 <div className="font-medium">{session.user.name}</div>
                 <Badge variant="secondary" className="text-[10px]">
@@ -59,6 +61,7 @@ export async function Nav() {
             userName={session.user.name}
             userRole={session.user.role}
             logoutButton={<LogoutButton />}
+            notificationToggle={<NotificationToggle />}
           />
         ) : null}
       </div>

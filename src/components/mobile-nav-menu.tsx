@@ -12,11 +12,13 @@ export function MobileNavMenu({
   userName,
   userRole,
   logoutButton,
+  notificationToggle,
 }: {
   links: { href: string; label: string }[];
   userName: string;
   userRole: string;
   logoutButton: React.ReactNode;
+  notificationToggle?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -43,6 +45,9 @@ export function MobileNavMenu({
             </div>
             {logoutButton}
           </div>
+          {notificationToggle ? (
+            <div className="mb-2">{notificationToggle}</div>
+          ) : null}
           <nav className="flex flex-col gap-1">
             {links.map((link) => (
               <Link

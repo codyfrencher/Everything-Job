@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/require-user";
+import { notifyUser } from "@/lib/push";
 import { jobSchema } from "@/lib/validators";
 import type { JobStatus } from "@prisma/client";
 
@@ -63,6 +64,14 @@ export async function createJob(
     return { error: "Could not create job" };
   }
 
+  if (job.assignedToId) {
+    await notifyUser(job.assignedToId, {
+      title: "New job assigned",
+      body: job.title,
+      url: `/jobs/${job.id}`,
+    });
+  }
+
   revalidatePath("/jobs");
   revalidatePath("/schedule");
   revalidatePath("/");
@@ -75,23 +84,40 @@ export async function updateJob(
   formData: FormData,
 ): Promise<FormState> {
   const user = await requireUser();
+  let newlyAssignedToId: string | null = null;
 
   try {
     const data = parseJobForm(formData);
-
-    if (user.role === "TECH") {
-      const existing = await db.job.findUnique({ where: { id: jobId } });
-      if (!existing || existing.assignedToId !== user.id) {
-        return { error: "Not authorized" };
-      }
+    const existing = await db.job.findUnique({ where: { id: jobId } });
+    if (!existing) {
+      return { error: "Job not found" };
+    }
+    if (user.role === "TECH" && existing.assignedToId !== user.id) {
+      return { error: "Not authorized" };
     }
 
-    await db.job.update({ where: { id: jobId }, data: toJobData(data) });
+    const jobData = toJobData(data);
+    if (jobData.assignedToId && jobData.assignedToId !== existing.assignedToId) {
+      newlyAssignedToId = jobData.assignedToId;
+    }
+
+    await db.job.update({ where: { id: jobId }, data: jobData });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return { error: err.issues[0]?.message ?? "Invalid job details" };
     }
     return { error: "Could not update job" };
+  }
+
+  if (newlyAssignedToId) {
+    const job = await db.job.findUnique({ where: { id: jobId } });
+    if (job) {
+      await notifyUser(newlyAssignedToId, {
+        title: "New job assigned",
+        body: job.title,
+        url: `/jobs/${jobId}`,
+      });
+    }
   }
 
   revalidatePath("/jobs");
@@ -120,13 +146,23 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
 
 export async function assignJob(jobId: string, assignedToId: string | null) {
   await requireRole("ADMIN", "DISPATCHER");
-  await db.job.update({
+  const existing = await db.job.findUnique({ where: { id: jobId } });
+
+  const job = await db.job.update({
     where: { id: jobId },
     data: {
       assignedToId,
       status: assignedToId ? "SCHEDULED" : "UNSCHEDULED",
     },
   });
+
+  if (assignedToId && assignedToId !== existing?.assignedToId) {
+    await notifyUser(assignedToId, {
+      title: "New job assigned",
+      body: job.title,
+      url: `/jobs/${jobId}`,
+    });
+  }
 
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);
