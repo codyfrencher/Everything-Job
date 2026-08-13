@@ -88,9 +88,12 @@ export default async function AuditPage() {
               <TableBody>
                 {entries.map((entry) => {
                   const jobTitle = entry.jobId ? jobTitleById.get(entry.jobId) : null;
+                  const meta = entry.metadata as { source?: string } | null;
                   const actorName = entry.actorId
                     ? (userNameById.get(entry.actorId) ?? "Unknown")
-                    : "—";
+                    : meta?.source === "leadconnector"
+                      ? "LeadConnector"
+                      : "—";
                   const details = formatDetails(entry.action, entry.metadata, userNameById);
 
                   return (
