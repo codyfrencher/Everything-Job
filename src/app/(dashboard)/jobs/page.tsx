@@ -90,74 +90,121 @@ export default async function JobsPage({
         </Button>
       </form>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Scheduled</TableHead>
-                <TableHead>Tech</TableHead>
-                <TableHead>Status</TableHead>
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={canManage ? 6 : 5} className="text-center text-muted-foreground">
-                    No jobs found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                jobs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell>
-                      <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
-                        {job.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {job.customer.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {job.scheduledStart
-                        ? job.scheduledStart.toLocaleString([], {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {job.assignedTo?.name ?? "Unassigned"}
-                    </TableCell>
-                    <TableCell>
-                      <JobStatusBadge status={job.status} />
-                    </TableCell>
-                    {canManage && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/jobs/${job.id}`}>Edit</Link>
-                          </Button>
-                          <DeleteButton
-                            action={deleteJob.bind(null, job.id)}
-                            label="Delete"
-                            confirmMessage={`Delete "${job.title}"? This can't be undone.`}
-                          />
-                        </div>
-                      </TableCell>
-                    )}
+      {jobs.length === 0 ? (
+        <Card>
+          <CardContent className="text-center text-muted-foreground">
+            No jobs found.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile: stacked cards */}
+          <div className="space-y-3 md:hidden">
+            {jobs.map((job) => (
+              <Card key={job.id}>
+                <CardContent className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/jobs/${job.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {job.title}
+                    </Link>
+                    <JobStatusBadge status={job.status} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">{job.customer.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {job.scheduledStart
+                      ? job.scheduledStart.toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })
+                      : "Not scheduled"}
+                    {" · "}
+                    {job.assignedTo?.name ?? "Unassigned"}
+                  </p>
+                  {canManage && (
+                    <div className="flex gap-2 pt-1">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/jobs/${job.id}`}>Edit</Link>
+                      </Button>
+                      <DeleteButton
+                        action={deleteJob.bind(null, job.id)}
+                        label="Delete"
+                        confirmMessage={`Delete "${job.title}"? This can't be undone.`}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <Card className="hidden md:block">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Scheduled</TableHead>
+                    <TableHead>Tech</TableHead>
+                    <TableHead>Status</TableHead>
+                    {canManage && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell>
+                        <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
+                          {job.title}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {job.customer.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {job.scheduledStart
+                          ? job.scheduledStart.toLocaleString([], {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {job.assignedTo?.name ?? "Unassigned"}
+                      </TableCell>
+                      <TableCell>
+                        <JobStatusBadge status={job.status} />
+                      </TableCell>
+                      {canManage && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/jobs/${job.id}`}>Edit</Link>
+                            </Button>
+                            <DeleteButton
+                              action={deleteJob.bind(null, job.id)}
+                              label="Delete"
+                              confirmMessage={`Delete "${job.title}"? This can't be undone.`}
+                            />
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
