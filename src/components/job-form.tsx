@@ -31,6 +31,7 @@ export function JobForm({
   defaultCustomerId,
   action,
   submitLabel,
+  readOnly = false,
 }: {
   job?: Job;
   customers: Customer[];
@@ -38,6 +39,11 @@ export function JobForm({
   defaultCustomerId?: string;
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   submitLabel: string;
+  /** Techs can only change status and notes — every other field is
+   * disabled here for clarity, but the real enforcement is server-side
+   * in updateJob, which ignores these fields for Tech submissions
+   * regardless of what the form sends. */
+  readOnly?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -46,7 +52,13 @@ export function JobForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="title">Title</Label>
-          <Input id="title" name="title" defaultValue={job?.title} required />
+          <Input
+            id="title"
+            name="title"
+            defaultValue={job?.title}
+            required
+            disabled={readOnly}
+          />
         </div>
 
         <div className="space-y-2">
@@ -54,6 +66,7 @@ export function JobForm({
           <Select
             name="customerId"
             defaultValue={job?.customerId ?? defaultCustomerId}
+            disabled={readOnly}
           >
             <SelectTrigger id="customerId" className="w-full">
               <SelectValue placeholder="Select a customer" />
@@ -73,6 +86,7 @@ export function JobForm({
           <Select
             name="assignedToId"
             defaultValue={job?.assignedToId ?? "unassigned"}
+            disabled={readOnly}
           >
             <SelectTrigger id="assignedToId" className="w-full">
               <SelectValue placeholder="Unassigned" />
@@ -113,6 +127,7 @@ export function JobForm({
             name="scheduledStart"
             type="datetime-local"
             defaultValue={toLocalInputValue(job?.scheduledStart ?? null)}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-2">
@@ -122,29 +137,55 @@ export function JobForm({
             name="scheduledEnd"
             type="datetime-local"
             defaultValue={toLocalInputValue(job?.scheduledEnd ?? null)}
+            disabled={readOnly}
           />
         </div>
 
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea id="description" name="description" defaultValue={job?.description ?? ""} />
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={job?.description ?? ""}
+            disabled={readOnly}
+          />
         </div>
 
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="street">Job site street address</Label>
-          <Input id="street" name="street" defaultValue={job?.street ?? ""} />
+          <Input
+            id="street"
+            name="street"
+            defaultValue={job?.street ?? ""}
+            disabled={readOnly}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="city">City</Label>
-          <Input id="city" name="city" defaultValue={job?.city ?? ""} />
+          <Input
+            id="city"
+            name="city"
+            defaultValue={job?.city ?? ""}
+            disabled={readOnly}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="state">State</Label>
-          <Input id="state" name="state" defaultValue={job?.state ?? "FL"} />
+          <Input
+            id="state"
+            name="state"
+            defaultValue={job?.state ?? "FL"}
+            disabled={readOnly}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="zip">ZIP</Label>
-          <Input id="zip" name="zip" defaultValue={job?.zip ?? ""} />
+          <Input
+            id="zip"
+            name="zip"
+            defaultValue={job?.zip ?? ""}
+            disabled={readOnly}
+          />
         </div>
 
         <div className="space-y-2 sm:col-span-2">

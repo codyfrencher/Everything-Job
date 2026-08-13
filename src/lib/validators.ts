@@ -32,6 +32,17 @@ export const jobSchema = z.object({
   notes: z.string().optional().or(z.literal("")),
 });
 
+export const techJobUpdateSchema = z.object({
+  status: z.enum([
+    "UNSCHEDULED",
+    "SCHEDULED",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "CANCELLED",
+  ]),
+  notes: z.string().optional().or(z.literal("")),
+});
+
 export const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email is required"),

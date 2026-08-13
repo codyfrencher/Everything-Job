@@ -49,7 +49,7 @@ export default async function SchedulePage({
       ...(isTech ? { assignedToId: user.id } : {}),
       OR: [
         { scheduledStart: { gte: dayStart, lte: dayEnd } },
-        { AND: [{ scheduledStart: null }, { status: "UNSCHEDULED" }] },
+        { scheduledStart: null },
       ],
     },
     include: { customer: { select: { name: true } } },

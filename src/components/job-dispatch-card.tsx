@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 
 import { assignJob } from "@/lib/actions/jobs";
@@ -29,7 +29,23 @@ export function JobDispatchCard({
   canUpdateStatus: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [assignedToId, setAssignedToId] = useState(job.assignedToId ?? "unassigned");
+  const [assignError, setAssignError] = useState<string | null>(null);
   const directions = directionsUrl(job);
+
+  function handleAssignChange(value: string) {
+    const previous = assignedToId;
+    setAssignedToId(value);
+    setAssignError(null);
+    startTransition(async () => {
+      try {
+        await assignJob(job.id, value === "unassigned" ? null : value);
+      } catch (err) {
+        setAssignedToId(previous);
+        setAssignError(err instanceof Error ? err.message : "Could not assign job");
+      }
+    });
+  }
 
   return (
     <Card className={isPending ? "opacity-60" : undefined}>
@@ -69,26 +85,24 @@ export function JobDispatchCard({
         {canAssign || canUpdateStatus ? (
           <div className="flex gap-2 pt-1">
             {canAssign ? (
-              <Select
-                defaultValue={job.assignedToId ?? "unassigned"}
-                onValueChange={(value) =>
-                  startTransition(() => {
-                    assignJob(job.id, value === "unassigned" ? null : value);
-                  })
-                }
-              >
-                <SelectTrigger size="sm" className="flex-1 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {techs.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex-1">
+                <Select value={assignedToId} onValueChange={handleAssignChange}>
+                  <SelectTrigger size="sm" className="w-full text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {techs.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {assignError ? (
+                  <p className="mt-1 text-xs text-destructive">{assignError}</p>
+                ) : null}
+              </div>
             ) : null}
 
             {canUpdateStatus ? (

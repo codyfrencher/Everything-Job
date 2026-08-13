@@ -15,7 +15,7 @@ export default async function NewJobPage({
   const [customers, techs] = await Promise.all([
     db.customer.findMany({ orderBy: { name: "asc" } }),
     db.user.findMany({
-      where: { role: { in: ["TECH", "DISPATCHER", "ADMIN"] } },
+      where: { role: "TECH" },
       orderBy: { name: "asc" },
     }),
   ]);

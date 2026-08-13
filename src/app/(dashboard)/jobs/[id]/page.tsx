@@ -30,7 +30,7 @@ export default async function JobDetailPage({
   const [customers, techs] = await Promise.all([
     db.customer.findMany({ orderBy: { name: "asc" } }),
     db.user.findMany({
-      where: { role: { in: ["TECH", "DISPATCHER", "ADMIN"] } },
+      where: { role: "TECH" },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -71,6 +71,7 @@ export default async function JobDetailPage({
             techs={techs}
             action={updateJobWithId}
             submitLabel="Save changes"
+            readOnly={user.role === "TECH"}
           />
         </CardContent>
       </Card>
