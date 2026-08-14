@@ -33,7 +33,7 @@ model User {
   phone        String?
   createdAt    DateTime @default(now())
 
-  jobsAssigned    Job[]      @relation("JobAssignee")
+  jobAssignments   JobAssignment[]
   customersCreated Customer[] @relation("CustomerCreatedBy")
   jobPhotosUploaded JobPhoto[] @relation("JobPhotoUploadedBy")
   pushSubscriptions PushSubscription[]
@@ -84,8 +84,7 @@ model Job {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  assignedToId String?
-  assignedTo   User?   @relation("JobAssignee", fields: [assignedToId], references: [id])
+  assignments JobAssignment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,7 +93,20 @@ model Job {
 
   @@index([status])
   @@index([scheduledStart])
-  @@index([assignedToId])
+}
+
+model JobAssignment {
+  id         String   @id @default(cuid())
+  assignedAt DateTime @default(now())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+  @@index([userId])
 }
 
 model JobPhoto {

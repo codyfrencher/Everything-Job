@@ -13,7 +13,7 @@ export function assertValidTimeRange(
 
 export function assertValidJobState(job: {
   status: JobStatus;
-  assignedToId: string | null;
+  assignedUserIds: string[];
   scheduledStart: Date | null;
 }): string | null {
   if (job.status === "SCHEDULED" && !job.scheduledStart) {
@@ -21,7 +21,7 @@ export function assertValidJobState(job: {
   }
   if (
     (job.status === "IN_PROGRESS" || job.status === "COMPLETED") &&
-    !job.assignedToId
+    job.assignedUserIds.length === 0
   ) {
     return "A job can't be in progress or completed without an assigned tech";
   }
@@ -30,24 +30,27 @@ export function assertValidJobState(job: {
 
 export async function assertNoOverlap(params: {
   jobId?: string;
-  assignedToId: string | null;
+  assignedUserIds: string[];
   scheduledStart: Date | null;
   scheduledEnd: Date | null;
 }): Promise<string | null> {
-  const { jobId, assignedToId, scheduledStart, scheduledEnd } = params;
-  if (!assignedToId || !scheduledStart || !scheduledEnd) return null;
+  const { jobId, assignedUserIds, scheduledStart, scheduledEnd } = params;
+  if (assignedUserIds.length === 0 || !scheduledStart || !scheduledEnd) return null;
 
-  const conflict = await db.job.findFirst({
+  const conflict = await db.jobAssignment.findFirst({
     where: {
-      assignedToId,
-      ...(jobId ? { id: { not: jobId } } : {}),
-      scheduledStart: { lt: scheduledEnd },
-      scheduledEnd: { gt: scheduledStart },
+      userId: { in: assignedUserIds },
+      ...(jobId ? { jobId: { not: jobId } } : {}),
+      job: {
+        scheduledStart: { lt: scheduledEnd },
+        scheduledEnd: { gt: scheduledStart },
+      },
     },
+    include: { job: { select: { title: true } }, user: { select: { name: true } } },
   });
 
   if (conflict) {
-    return `Overlaps with "${conflict.title}", already scheduled for this tech at that time`;
+    return `Overlaps with "${conflict.job.title}", already scheduled for ${conflict.user.name} at that time`;
   }
   return null;
 }

@@ -20,12 +20,14 @@ import type { JobStatus } from "@prisma/client";
 export type FormState = { error?: string } | undefined;
 
 function parseJobForm(formData: FormData) {
-  const assignedToId = formData.get("assignedToId");
+  const assignedToIds = formData
+    .getAll("assignedToIds")
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
   return jobSchema.parse({
     title: formData.get("title"),
     description: formData.get("description"),
     customerId: formData.get("customerId"),
-    assignedToId: assignedToId === "unassigned" ? "" : assignedToId,
+    assignedToIds,
     status: formData.get("status"),
     scheduledStart: formData.get("scheduledStart"),
     scheduledEnd: formData.get("scheduledEnd"),
@@ -42,7 +44,6 @@ function toJobData(data: ReturnType<typeof parseJobForm>) {
     title: data.title,
     description: data.description || null,
     customerId: data.customerId,
-    assignedToId: data.assignedToId || null,
     status: data.status,
     scheduledStart: data.scheduledStart
       ? parseZonedDateTime(data.scheduledStart)
@@ -58,11 +59,11 @@ function toJobData(data: ReturnType<typeof parseJobForm>) {
   };
 }
 
-async function assertAssignableTech(userId: string | null) {
-  if (!userId) return null;
-  const target = await db.user.findUnique({ where: { id: userId } });
-  if (!target || target.role !== "TECH") {
-    return "Jobs can only be assigned to a Tech";
+async function assertAssignableTechs(userIds: string[]): Promise<string | null> {
+  if (userIds.length === 0) return null;
+  const targets = await db.user.findMany({ where: { id: { in: userIds } } });
+  if (targets.length !== userIds.length || targets.some((t) => t.role !== "TECH")) {
+    return "Jobs can only be assigned to Techs";
   }
   return null;
 }
@@ -74,11 +75,13 @@ export async function createJob(
   const user = await requireRole("ADMIN", "DISPATCHER");
 
   let job;
+  let assignedToIds: string[] = [];
   try {
     const data = parseJobForm(formData);
+    assignedToIds = data.assignedToIds;
     const jobData = toJobData(data);
 
-    const assignableError = await assertAssignableTech(jobData.assignedToId);
+    const assignableError = await assertAssignableTechs(assignedToIds);
     if (assignableError) return { error: assignableError };
 
     const timeError = assertValidTimeRange(
@@ -87,17 +90,26 @@ export async function createJob(
     );
     if (timeError) return { error: timeError };
 
-    const stateError = assertValidJobState(jobData);
+    const stateError = assertValidJobState({
+      status: jobData.status,
+      assignedUserIds: assignedToIds,
+      scheduledStart: jobData.scheduledStart,
+    });
     if (stateError) return { error: stateError };
 
     const overlapError = await assertNoOverlap({
-      assignedToId: jobData.assignedToId,
+      assignedUserIds: assignedToIds,
       scheduledStart: jobData.scheduledStart,
       scheduledEnd: jobData.scheduledEnd,
     });
     if (overlapError) return { error: overlapError };
 
-    job = await db.job.create({ data: jobData });
+    job = await db.job.create({
+      data: {
+        ...jobData,
+        assignments: { create: assignedToIds.map((userId) => ({ userId })) },
+      },
+    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return { error: err.issues[0]?.message ?? "Invalid job details" };
@@ -107,13 +119,15 @@ export async function createJob(
 
   await logJobAudit("created", job.id, user.id);
 
-  if (job.assignedToId) {
-    await notifyUser(job.assignedToId, {
-      title: "New job assigned",
-      body: job.title,
-      url: `/jobs/${job.id}`,
-    });
-  }
+  await Promise.all(
+    assignedToIds.map((userId) =>
+      notifyUser(userId, {
+        title: "New job assigned",
+        body: job.title,
+        url: `/jobs/${job.id}`,
+      }),
+    ),
+  );
 
   revalidatePath("/jobs");
   revalidatePath("/schedule");
@@ -127,16 +141,20 @@ export async function updateJob(
   formData: FormData,
 ): Promise<FormState> {
   const user = await requireUser();
-  let newlyAssignedToId: string | null = null;
+  let newlyAssignedIds: string[] = [];
 
   try {
-    const existing = await db.job.findUnique({ where: { id: jobId } });
+    const existing = await db.job.findUnique({
+      where: { id: jobId },
+      include: { assignments: true },
+    });
     if (!existing) {
       return { error: "Job not found" };
     }
+    const existingAssignedIds = existing.assignments.map((a) => a.userId);
 
     const isTech = user.role === "TECH";
-    if (isTech && existing.assignedToId !== user.id) {
+    if (isTech && !existingAssignedIds.includes(user.id)) {
       return { error: "Not authorized" };
     }
 
@@ -144,6 +162,7 @@ export async function updateJob(
     // doesn't even accept the other fields, regardless of what the form
     // submitted. Everyone else uses the full job schema.
     let jobData: ReturnType<typeof toJobData>;
+    let assignedToIds: string[];
     if (isTech) {
       const data = techJobUpdateSchema.parse({
         status: formData.get("status"),
@@ -153,7 +172,6 @@ export async function updateJob(
         title: existing.title,
         description: existing.description,
         customerId: existing.customerId,
-        assignedToId: existing.assignedToId,
         status: data.status,
         scheduledStart: existing.scheduledStart,
         scheduledEnd: existing.scheduledEnd,
@@ -163,16 +181,16 @@ export async function updateJob(
         zip: existing.zip,
         notes: data.notes || null,
       };
+      assignedToIds = existingAssignedIds;
     } else {
       const data = parseJobForm(formData);
+      assignedToIds = data.assignedToIds;
       jobData = toJobData(data);
 
-      const assignableError = await assertAssignableTech(jobData.assignedToId);
+      const assignableError = await assertAssignableTechs(assignedToIds);
       if (assignableError) return { error: assignableError };
 
-      if (jobData.assignedToId && jobData.assignedToId !== existing.assignedToId) {
-        newlyAssignedToId = jobData.assignedToId;
-      }
+      newlyAssignedIds = assignedToIds.filter((id) => !existingAssignedIds.includes(id));
     }
 
     const timeError = assertValidTimeRange(
@@ -181,18 +199,32 @@ export async function updateJob(
     );
     if (timeError) return { error: timeError };
 
-    const stateError = assertValidJobState(jobData);
+    const stateError = assertValidJobState({
+      status: jobData.status,
+      assignedUserIds: assignedToIds,
+      scheduledStart: jobData.scheduledStart,
+    });
     if (stateError) return { error: stateError };
 
     const overlapError = await assertNoOverlap({
       jobId,
-      assignedToId: jobData.assignedToId,
+      assignedUserIds: assignedToIds,
       scheduledStart: jobData.scheduledStart,
       scheduledEnd: jobData.scheduledEnd,
     });
     if (overlapError) return { error: overlapError };
 
-    await db.job.update({ where: { id: jobId }, data: jobData });
+    const removedIds = existingAssignedIds.filter((id) => !assignedToIds.includes(id));
+
+    await db.$transaction([
+      db.job.update({ where: { id: jobId }, data: jobData }),
+      ...(removedIds.length > 0
+        ? [db.jobAssignment.deleteMany({ where: { jobId, userId: { in: removedIds } } })]
+        : []),
+      ...newlyAssignedIds.map((userId) =>
+        db.jobAssignment.create({ data: { jobId, userId } }),
+      ),
+    ]);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return { error: err.issues[0]?.message ?? "Invalid job details" };
@@ -202,14 +234,18 @@ export async function updateJob(
 
   await logJobAudit("edited", jobId, user.id);
 
-  if (newlyAssignedToId) {
+  if (newlyAssignedIds.length > 0) {
     const job = await db.job.findUnique({ where: { id: jobId } });
     if (job) {
-      await notifyUser(newlyAssignedToId, {
-        title: "New job assigned",
-        body: job.title,
-        url: `/jobs/${jobId}`,
-      });
+      await Promise.all(
+        newlyAssignedIds.map((userId) =>
+          notifyUser(userId, {
+            title: "New job assigned",
+            body: job.title,
+            url: `/jobs/${jobId}`,
+          }),
+        ),
+      );
     }
   }
 
@@ -222,16 +258,20 @@ export async function updateJob(
 export async function updateJobStatus(jobId: string, status: JobStatus) {
   const user = await requireUser();
 
-  const existing = await db.job.findUnique({ where: { id: jobId } });
+  const existing = await db.job.findUnique({
+    where: { id: jobId },
+    include: { assignments: true },
+  });
   if (!existing) throw new Error("Job not found");
+  const assignedUserIds = existing.assignments.map((a) => a.userId);
 
-  if (user.role === "TECH" && existing.assignedToId !== user.id) {
+  if (user.role === "TECH" && !assignedUserIds.includes(user.id)) {
     throw new Error("Not authorized");
   }
 
   const stateError = assertValidJobState({
     status,
-    assignedToId: existing.assignedToId,
+    assignedUserIds,
     scheduledStart: existing.scheduledStart,
   });
   if (stateError) throw new Error(stateError);
@@ -249,62 +289,80 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
   revalidatePath("/");
 }
 
-export async function assignJob(jobId: string, assignedToId: string | null) {
+export async function assignTechToJob(jobId: string, userId: string) {
   const user = await requireRole("ADMIN", "DISPATCHER");
 
-  const assignableError = await assertAssignableTech(assignedToId);
+  const assignableError = await assertAssignableTechs([userId]);
   if (assignableError) throw new Error(assignableError);
 
-  const existing = await db.job.findUnique({ where: { id: jobId } });
+  const existing = await db.job.findUnique({
+    where: { id: jobId },
+    include: { assignments: true },
+  });
   if (!existing) throw new Error("Job not found");
+  if (existing.assignments.some((a) => a.userId === userId)) return;
 
   const overlapError = await assertNoOverlap({
     jobId,
-    assignedToId,
+    assignedUserIds: [userId],
     scheduledStart: existing.scheduledStart,
     scheduledEnd: existing.scheduledEnd,
   });
   if (overlapError) throw new Error(overlapError);
 
   // Promote UNSCHEDULED -> SCHEDULED when there's already a time set.
-  // A SCHEDULED job no longer needs a tech (see assertValidJobState — a
-  // job can be booked with a time before staffing is decided, e.g. a
-  // LeadConnector appointment), but IN_PROGRESS/COMPLETED still do, so
-  // unassigning one of those steps it back down to whatever its time
-  // alone supports.
   let nextStatus = existing.status;
-  if (!assignedToId) {
-    if (existing.status === "IN_PROGRESS" || existing.status === "COMPLETED") {
-      nextStatus = existing.scheduledStart ? "SCHEDULED" : "UNSCHEDULED";
-    }
-  } else if (existing.scheduledStart && existing.status === "UNSCHEDULED") {
+  if (existing.scheduledStart && existing.status === "UNSCHEDULED") {
     nextStatus = "SCHEDULED";
   }
 
-  const job = await db.job.update({
-    where: { id: jobId },
-    data: { assignedToId, status: nextStatus },
+  await db.$transaction([
+    db.jobAssignment.create({ data: { jobId, userId } }),
+    db.job.update({ where: { id: jobId }, data: { status: nextStatus } }),
+  ]);
+
+  await logJobAudit("assigned", jobId, user.id, { userId });
+
+  await notifyUser(userId, {
+    title: "New job assigned",
+    body: existing.title,
+    url: `/jobs/${jobId}`,
   });
 
-  if (assignedToId !== existing.assignedToId) {
-    const auditAction = !existing.assignedToId
-      ? "assigned"
-      : assignedToId
-        ? "reassigned"
-        : "unassigned";
-    await logJobAudit(auditAction, jobId, user.id, {
-      from: existing.assignedToId,
-      to: assignedToId,
-    });
+  revalidatePath("/jobs");
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/schedule");
+  revalidatePath("/");
+}
+
+export async function unassignTechFromJob(jobId: string, userId: string) {
+  const user = await requireRole("ADMIN", "DISPATCHER");
+
+  const existing = await db.job.findUnique({
+    where: { id: jobId },
+    include: { assignments: true },
+  });
+  if (!existing) throw new Error("Job not found");
+
+  const remainingCount = existing.assignments.filter((a) => a.userId !== userId).length;
+
+  // A job in progress or completed still needs at least one tech (see
+  // assertValidJobState) — step it back down to whatever its time alone
+  // supports if this was the last one assigned.
+  let nextStatus = existing.status;
+  if (
+    remainingCount === 0 &&
+    (existing.status === "IN_PROGRESS" || existing.status === "COMPLETED")
+  ) {
+    nextStatus = existing.scheduledStart ? "SCHEDULED" : "UNSCHEDULED";
   }
 
-  if (assignedToId && assignedToId !== existing.assignedToId) {
-    await notifyUser(assignedToId, {
-      title: "New job assigned",
-      body: job.title,
-      url: `/jobs/${jobId}`,
-    });
-  }
+  await db.$transaction([
+    db.jobAssignment.deleteMany({ where: { jobId, userId } }),
+    db.job.update({ where: { id: jobId }, data: { status: nextStatus } }),
+  ]);
+
+  await logJobAudit("unassigned", jobId, user.id, { userId });
 
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${jobId}`);
