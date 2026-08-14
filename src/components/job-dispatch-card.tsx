@@ -114,6 +114,9 @@ export function JobDispatchCard({
 
         {canAssign ? (
           <div className="flex flex-wrap gap-1">
+            {assignedTechs.length === 0 ? (
+              <span className="text-xs font-medium text-amber-600">Unassigned</span>
+            ) : null}
             {assignedTechs.map((tech) => (
               <Badge key={tech.id} variant="secondary" className="gap-1 pr-1">
                 {tech.name}
