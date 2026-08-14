@@ -95,7 +95,7 @@ async function main() {
       title: "AC not cooling",
       description: "Unit runs but blows warm air.",
       customerId: customer1.id,
-      assignedToId: tech1.id,
+      assignments: { create: { userId: tech1.id } },
       status: "SCHEDULED",
       scheduledStart: today9am,
       scheduledEnd: today11am,
@@ -110,7 +110,7 @@ async function main() {
     data: {
       title: "Annual furnace inspection",
       customerId: customer2.id,
-      assignedToId: tech2.id,
+      assignments: { create: { userId: tech2.id } },
       status: "SCHEDULED",
       scheduledStart: today1pm,
       scheduledEnd: today3pm,

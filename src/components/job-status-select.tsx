@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { updateJobStatus } from "@/lib/actions/jobs";
 import { statusLabels } from "@/components/job-status-badge";
@@ -26,6 +26,16 @@ export function JobStatusSelect({
   const [value, setValue] = useState(status);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // The same job can render in more than one place at once (e.g. every
+  // tech column it's assigned to on the dispatch board), each as its own
+  // component instance with independent local state. When a mutation
+  // lands through one instance, revalidatePath refreshes this instance's
+  // `status` prop too — resync local state to it rather than letting a
+  // sibling instance go stale.
+  useEffect(() => {
+    setValue(status);
+  }, [status]);
 
   function handleChange(next: JobStatus) {
     const previous = value;

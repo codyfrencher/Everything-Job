@@ -27,7 +27,7 @@ export function JobForm({
   submitLabel,
   readOnly = false,
 }: {
-  job?: Job;
+  job?: Job & { assignments?: { userId: string }[] };
   customers: Customer[];
   techs: User[];
   defaultCustomerId?: string;
@@ -40,6 +40,7 @@ export function JobForm({
   readOnly?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
+  const assignedToIds = job?.assignments?.map((a) => a.userId) ?? [];
 
   return (
     <form action={formAction} className="space-y-4">
@@ -76,24 +77,29 @@ export function JobForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="assignedToId">Assigned to</Label>
-          <Select
-            name="assignedToId"
-            defaultValue={job?.assignedToId ?? "unassigned"}
-            disabled={readOnly}
-          >
-            <SelectTrigger id="assignedToId" className="w-full">
-              <SelectValue placeholder="Unassigned" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {techs.map((tech) => (
-                <SelectItem key={tech.id} value={tech.id}>
+          <Label>Assigned techs</Label>
+          <div className="space-y-1.5 rounded-lg border border-input p-3">
+            {techs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No techs on the team yet.</p>
+            ) : (
+              techs.map((tech) => (
+                <label
+                  key={tech.id}
+                  className="flex items-center gap-2 text-sm has-disabled:text-muted-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    name="assignedToIds"
+                    value={tech.id}
+                    defaultChecked={assignedToIds.includes(tech.id)}
+                    disabled={readOnly}
+                    className="h-4 w-4 rounded border-input"
+                  />
                   {tech.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </label>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">

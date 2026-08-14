@@ -43,23 +43,28 @@ export default async function SchedulePage({
 
   const jobs = await db.job.findMany({
     where: {
-      ...(isTech ? { assignedToId: user.id } : {}),
+      ...(isTech ? { assignments: { some: { userId: user.id } } } : {}),
       OR: [
         { scheduledStart: { gte: dayStart, lte: dayEnd } },
         { scheduledStart: null },
       ],
     },
-    include: { customer: { select: { name: true } } },
+    include: {
+      customer: { select: { name: true } },
+      assignments: { select: { userId: true } },
+    },
     orderBy: { scheduledStart: "asc" },
   });
 
   const unscheduled = jobs.filter((j) => !j.scheduledStart);
-  const needsTech = jobs.filter((j) => j.scheduledStart && !j.assignedToId);
+  const needsTech = jobs.filter((j) => j.scheduledStart && j.assignments.length === 0);
   const jobsByTech = new Map<string, typeof jobs>();
   for (const tech of techs) {
     jobsByTech.set(
       tech.id,
-      jobs.filter((j) => j.scheduledStart && j.assignedToId === tech.id),
+      jobs.filter(
+        (j) => j.scheduledStart && j.assignments.some((a) => a.userId === tech.id),
+      ),
     );
   }
 
@@ -95,7 +100,7 @@ export default async function SchedulePage({
                   job={job}
                   techs={techs}
                   canAssign={canManage}
-                  canUpdateStatus={canManage || job.assignedToId === user.id}
+                  canUpdateStatus={canManage || job.assignments.some((a) => a.userId === user.id)}
                 />
               ))
             )}
@@ -140,7 +145,7 @@ export default async function SchedulePage({
                     job={job}
                     techs={techs}
                     canAssign={canManage}
-                    canUpdateStatus={canManage || job.assignedToId === user.id}
+                    canUpdateStatus={canManage || job.assignments.some((a) => a.userId === user.id)}
                   />
                 ))
               )}

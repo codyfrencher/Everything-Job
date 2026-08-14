@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatInTimeZone } from "date-fns-tz";
 
-import { assignJob } from "@/lib/actions/jobs";
+import { assignTechToJob, unassignTechFromJob } from "@/lib/actions/jobs";
 import { directionsUrl } from "@/lib/maps";
 import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 import { JobStatusBadge } from "@/components/job-status-badge";
 import { JobStatusSelect } from "@/components/job-status-select";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -25,26 +26,59 @@ export function JobDispatchCard({
   canAssign,
   canUpdateStatus,
 }: {
-  job: Job & { customer: { name: string } };
+  job: Job & { customer: { name: string }; assignments: { userId: string }[] };
   techs: User[];
   canAssign: boolean;
   canUpdateStatus: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [assignedToId, setAssignedToId] = useState(job.assignedToId ?? "unassigned");
+  const [assignedIds, setAssignedIds] = useState(job.assignments.map((a) => a.userId));
   const [assignError, setAssignError] = useState<string | null>(null);
   const directions = directionsUrl(job);
 
-  function handleAssignChange(value: string) {
-    const previous = assignedToId;
-    setAssignedToId(value);
+  // The same job can render as more than one card at once (once per tech
+  // column it's assigned to). When a mutation lands through one card,
+  // revalidatePath refreshes every card's `job` prop — resync local state
+  // to it rather than letting a sibling card go stale.
+  const assignedIdsKey = job.assignments
+    .map((a) => a.userId)
+    .slice()
+    .sort()
+    .join(",");
+  useEffect(() => {
+    setAssignedIds(job.assignments.map((a) => a.userId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignedIdsKey]);
+
+  const assignedTechs = assignedIds
+    .map((id) => techs.find((t) => t.id === id))
+    .filter((t): t is User => !!t);
+  const unassignedTechs = techs.filter((t) => !assignedIds.includes(t.id));
+
+  function handleAdd(userId: string) {
+    const previous = assignedIds;
+    setAssignedIds([...assignedIds, userId]);
     setAssignError(null);
     startTransition(async () => {
       try {
-        await assignJob(job.id, value === "unassigned" ? null : value);
+        await assignTechToJob(job.id, userId);
       } catch (err) {
-        setAssignedToId(previous);
-        setAssignError(err instanceof Error ? err.message : "Could not assign job");
+        setAssignedIds(previous);
+        setAssignError(err instanceof Error ? err.message : "Could not assign tech");
+      }
+    });
+  }
+
+  function handleRemove(userId: string) {
+    const previous = assignedIds;
+    setAssignedIds(assignedIds.filter((id) => id !== userId));
+    setAssignError(null);
+    startTransition(async () => {
+      try {
+        await unassignTechFromJob(job.id, userId);
+      } catch (err) {
+        setAssignedIds(previous);
+        setAssignError(err instanceof Error ? err.message : "Could not unassign tech");
       }
     });
   }
@@ -78,17 +112,38 @@ export function JobDispatchCard({
           </a>
         ) : null}
 
+        {canAssign ? (
+          <div className="flex flex-wrap gap-1">
+            {assignedTechs.map((tech) => (
+              <Badge key={tech.id} variant="secondary" className="gap-1 pr-1">
+                {tech.name}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(tech.id)}
+                  aria-label={`Remove ${tech.name}`}
+                  className="ml-0.5 rounded-full px-1 hover:bg-muted-foreground/20"
+                >
+                  ×
+                </button>
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+
         {canAssign || canUpdateStatus ? (
           <div className="flex gap-2 pt-1">
             {canAssign ? (
               <div className="flex-1">
-                <Select value={assignedToId} onValueChange={handleAssignChange}>
+                <Select
+                  value=""
+                  onValueChange={handleAdd}
+                  disabled={unassignedTechs.length === 0}
+                >
                   <SelectTrigger size="sm" className="w-full text-xs">
-                    <SelectValue />
+                    <SelectValue placeholder="+ Add tech" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {techs.map((tech) => (
+                    {unassignedTechs.map((tech) => (
                       <SelectItem key={tech.id} value={tech.id}>
                         {tech.name}
                       </SelectItem>

@@ -32,7 +32,7 @@ function formatDetails(
   userNameById: Map<string, string>,
 ) {
   if (!metadata || typeof metadata !== "object") return null;
-  const meta = metadata as { from?: string | null; to?: string | null };
+  const meta = metadata as { from?: string | null; to?: string | null; userId?: string };
 
   if (action === "status_changed") {
     const from = meta.from ? (statusLabels[meta.from as JobStatus] ?? meta.from) : "—";
@@ -40,6 +40,12 @@ function formatDetails(
     return `${from} → ${to}`;
   }
 
+  // Current shape: one row per tech added/removed.
+  if ((action === "assigned" || action === "unassigned") && meta.userId) {
+    return userNameById.get(meta.userId) ?? "Unknown";
+  }
+
+  // Historical shape from the single-assignee era.
   if (action === "assigned" || action === "reassigned" || action === "unassigned") {
     const from = meta.from ? (userNameById.get(meta.from) ?? "Unknown") : "Unassigned";
     const to = meta.to ? (userNameById.get(meta.to) ?? "Unknown") : "Unassigned";

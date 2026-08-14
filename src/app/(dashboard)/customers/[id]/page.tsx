@@ -27,7 +27,7 @@ export default async function CustomerDetailPage({
     where: { id },
     include: {
       jobs: {
-        include: { assignedTo: true },
+        include: { assignments: { include: { user: true } } },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -100,7 +100,9 @@ export default async function CustomerDetailPage({
                         {job.title}
                       </Link>
                       <p className="text-sm text-muted-foreground">
-                        {job.assignedTo ? job.assignedTo.name : "Unassigned"}
+                        {job.assignments.length > 0
+                          ? job.assignments.map((a) => a.user.name).join(", ")
+                          : "Unassigned"}
                       </p>
                     </div>
                     <JobStatusBadge status={job.status} />

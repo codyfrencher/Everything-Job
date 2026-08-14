@@ -20,10 +20,14 @@ export default async function JobDetailPage({
 
   const job = await db.job.findUnique({
     where: { id },
-    include: { photos: { orderBy: { createdAt: "desc" } } },
+    include: {
+      photos: { orderBy: { createdAt: "desc" } },
+      assignments: { select: { userId: true } },
+    },
   });
   if (!job) notFound();
-  if (user.role === "TECH" && job.assignedToId !== user.id) notFound();
+  const assignedUserIds = job.assignments.map((a) => a.userId);
+  if (user.role === "TECH" && !assignedUserIds.includes(user.id)) notFound();
 
   const canManage = user.role === "ADMIN" || user.role === "DISPATCHER";
 
@@ -87,7 +91,7 @@ export default async function JobDetailPage({
           <JobPhotos
             jobId={job.id}
             photos={job.photos}
-            canDelete={canManage || job.assignedToId === user.id}
+            canDelete={canManage || assignedUserIds.includes(user.id)}
           />
         </CardContent>
       </Card>

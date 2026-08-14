@@ -26,8 +26,8 @@ export default async function DashboardPage() {
   const session = await auth();
   const user = session!.user;
   const isTech = user.role === "TECH";
-  const canUpdateStatus = (job: { assignedToId: string | null }) =>
-    !isTech || job.assignedToId === user.id;
+  const canUpdateStatus = (job: { assignments: { userId: string }[] }) =>
+    !isTech || job.assignments.some((a) => a.userId === user.id);
 
   const todayStr = formatInTimeZone(new Date(), COMPANY_TIME_ZONE, "yyyy-MM-dd");
   const startOfDay = fromZonedTime(`${todayStr}T00:00:00`, COMPANY_TIME_ZONE);
@@ -37,11 +37,11 @@ export default async function DashboardPage() {
     db.job.groupBy({
       by: ["status"],
       _count: { _all: true },
-      where: isTech ? { assignedToId: user.id } : undefined,
+      where: isTech ? { assignments: { some: { userId: user.id } } } : undefined,
     }),
     db.job.findMany({
       where: {
-        ...(isTech ? { assignedToId: user.id } : {}),
+        ...(isTech ? { assignments: { some: { userId: user.id } } } : {}),
         OR: [
           {
             scheduledStart: { gte: startOfDay, lte: endOfDay },
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
           { status: "UNSCHEDULED" },
         ],
       },
-      include: { customer: true, assignedTo: true },
+      include: { customer: true, assignments: { include: { user: true } } },
       orderBy: { scheduledStart: "asc" },
       take: 10,
     }),
@@ -115,7 +115,9 @@ export default async function DashboardPage() {
                     </Link>
                     <p className="text-sm text-muted-foreground">
                       {job.customer.name}
-                      {job.assignedTo ? ` · ${job.assignedTo.name}` : " · Unassigned"}
+                      {job.assignments.length > 0
+                        ? ` · ${job.assignments.map((a) => a.user.name).join(", ")}`
+                        : " · Unassigned"}
                       {job.scheduledStart
                         ? ` · ${formatInTimeZone(
                             job.scheduledStart,

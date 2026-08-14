@@ -12,8 +12,10 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 async function assertCanAccessJob(jobId: string) {
   const user = await requireUser();
   if (user.role === "TECH") {
-    const job = await db.job.findUnique({ where: { id: jobId } });
-    if (!job || job.assignedToId !== user.id) {
+    const assignment = await db.jobAssignment.findUnique({
+      where: { jobId_userId: { jobId, userId: user.id } },
+    });
+    if (!assignment) {
       throw new Error("Not authorized");
     }
   }

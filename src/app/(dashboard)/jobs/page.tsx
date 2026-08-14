@@ -26,6 +26,12 @@ function formatSchedule(date: Date) {
   return formatInTimeZone(date, COMPANY_TIME_ZONE, "MMM d, h:mm a");
 }
 
+function assignedNames(assignments: { user: { name: string } }[]) {
+  return assignments.length > 0
+    ? assignments.map((a) => a.user.name).join(", ")
+    : "Unassigned";
+}
+
 export default async function JobsPage({
   searchParams,
 }: {
@@ -45,11 +51,11 @@ export default async function JobsPage({
 
   const jobs = await db.job.findMany({
     where: {
-      ...(isTech ? { assignedToId: user.id } : {}),
+      ...(isTech ? { assignments: { some: { userId: user.id } } } : {}),
       ...(status ? { status: status as JobStatus } : {}),
-      ...(!isTech && techId ? { assignedToId: techId } : {}),
+      ...(!isTech && techId ? { assignments: { some: { userId: techId } } } : {}),
     },
-    include: { customer: true, assignedTo: true },
+    include: { customer: true, assignments: { include: { user: true } } },
     orderBy: [{ scheduledStart: "asc" }, { createdAt: "desc" }],
   });
 
@@ -124,7 +130,7 @@ export default async function JobsPage({
                       ? formatSchedule(job.scheduledStart)
                       : "Not scheduled"}
                     {" · "}
-                    {job.assignedTo?.name ?? "Unassigned"}
+                    {assignedNames(job.assignments)}
                   </p>
                   {canManage && (
                     <div className="flex gap-2 pt-1">
@@ -174,7 +180,7 @@ export default async function JobsPage({
                           : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {job.assignedTo?.name ?? "Unassigned"}
+                        {assignedNames(job.assignments)}
                       </TableCell>
                       <TableCell>
                         <JobStatusBadge status={job.status} />
