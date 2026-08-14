@@ -207,22 +207,29 @@ export default async function SchedulePage({
       ) : null}
 
       {view === "week" ? (
-        <div className="space-y-5">
-          {weekDays.map((day) => {
-            const dayJobs = jobsForDay(day);
-            return (
-              <div key={day} className="space-y-2">
-                <h2 className="text-sm font-semibold text-muted-foreground">
-                  {formatInTimeZone(zonedStartOfDay(day), COMPANY_TIME_ZONE, "EEEE, MMM d")}
-                </h2>
-                {dayJobs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No jobs scheduled.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-3">{dayJobs.map(renderCard)}</div>
-                )}
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[1540px] grid-cols-7 gap-px rounded-lg border border-border bg-border text-sm">
+            {weekDays.map((day) => (
+              <div
+                key={`h-${day}`}
+                className="bg-muted px-2 py-1.5 text-center text-xs font-semibold text-muted-foreground"
+              >
+                {formatInTimeZone(zonedStartOfDay(day), COMPANY_TIME_ZONE, "EEE, MMM d")}
               </div>
-            );
-          })}
+            ))}
+            {weekDays.map((day) => {
+              const dayJobs = jobsForDay(day);
+              return (
+                <div key={day} className="min-h-32 space-y-2 bg-background p-2">
+                  {dayJobs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No jobs scheduled.</p>
+                  ) : (
+                    dayJobs.map(renderCard)
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto">

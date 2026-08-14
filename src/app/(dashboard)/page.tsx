@@ -40,15 +40,18 @@ export default async function DashboardPage() {
       where: isTech ? { assignments: { some: { userId: user.id } } } : undefined,
     }),
     db.job.findMany({
-      where: {
-        ...(isTech ? { assignments: { some: { userId: user.id } } } : {}),
-        OR: [
-          {
+      where: isTech
+        ? {
+            assignments: { some: { userId: user.id } },
             scheduledStart: { gte: startOfDay, lte: endOfDay },
+            status: { notIn: ["CANCELLED", "COMPLETED"] },
+          }
+        : {
+            OR: [
+              { scheduledStart: { gte: startOfDay, lte: endOfDay } },
+              { status: "UNSCHEDULED" },
+            ],
           },
-          { status: "UNSCHEDULED" },
-        ],
-      },
       include: { customer: true, assignments: { include: { user: true } } },
       orderBy: { scheduledStart: "asc" },
       take: 10,
@@ -91,16 +94,22 @@ export default async function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Today &amp; unscheduled</CardTitle>
+          <CardTitle>{isTech ? "Today's jobs" : "Today & unscheduled"}</CardTitle>
         </CardHeader>
         <CardContent>
           {todaysJobs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing scheduled today. Head to{" "}
-              <Link href="/jobs/new" className="underline">
-                new job
-              </Link>{" "}
-              to add one.
+              {isTech
+                ? "Nothing on your schedule today."
+                : (
+                  <>
+                    Nothing scheduled today. Head to{" "}
+                    <Link href="/jobs/new" className="underline">
+                      new job
+                    </Link>{" "}
+                    to add one.
+                  </>
+                )}
             </p>
           ) : (
             <ul className="divide-y">
