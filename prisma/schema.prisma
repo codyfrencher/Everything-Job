@@ -91,6 +91,10 @@ model Job {
 
   photos JobPhoto[]
 
+  // LeadConnector calendar event id, set when a job is created by the
+  // import tool — lets a re-run skip appointments already brought in.
+  externalId String? @unique
+
   @@index([status])
   @@index([scheduledStart])
 }
