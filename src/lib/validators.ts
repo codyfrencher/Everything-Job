@@ -32,14 +32,11 @@ export const jobSchema = z.object({
   notes: z.string().optional().or(z.literal("")),
 });
 
+// Cancelling a job removes it from the pipeline entirely — that's a
+// dispatch-level call, not a field-level status update, so Techs can move
+// a job through every other status but not this one.
 export const techJobUpdateSchema = z.object({
-  status: z.enum([
-    "UNSCHEDULED",
-    "SCHEDULED",
-    "IN_PROGRESS",
-    "COMPLETED",
-    "CANCELLED",
-  ]),
+  status: z.enum(["UNSCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED"]),
   notes: z.string().optional().or(z.literal("")),
 });
 

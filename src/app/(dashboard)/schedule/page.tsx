@@ -4,6 +4,7 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 import { JobDispatchCard } from "@/components/job-dispatch-card";
+import { HorizontalScroller } from "@/components/horizontal-scroller";
 import { Button } from "@/components/ui/button";
 import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -207,7 +208,7 @@ export default async function SchedulePage({
       ) : null}
 
       {view === "week" ? (
-        <div className="overflow-x-auto">
+        <HorizontalScroller>
           <div className="grid min-w-[1540px] grid-cols-7 gap-px rounded-lg border border-border bg-border text-sm">
             {weekDays.map((day) => (
               <div
@@ -230,9 +231,9 @@ export default async function SchedulePage({
               );
             })}
           </div>
-        </div>
+        </HorizontalScroller>
       ) : (
-        <div className="overflow-x-auto">
+        <HorizontalScroller>
           <div className="grid min-w-[720px] grid-cols-7 gap-px rounded-lg border border-border bg-border text-sm">
             {WEEKDAY_LABELS.map((label) => (
               <div
@@ -279,7 +280,7 @@ export default async function SchedulePage({
               }),
             )}
           </div>
-        </div>
+        </HorizontalScroller>
       )}
     </div>
   );

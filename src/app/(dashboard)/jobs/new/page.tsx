@@ -20,6 +20,13 @@ export default async function NewJobPage({
     }),
   ]);
 
+  // Only honor a pre-selected customer if they're actually in the list
+  // rendered below — otherwise the select would silently fall back to
+  // whichever customer sorts first, with no indication anything was wrong.
+  const defaultCustomerId = customers.some((c) => c.id === customerId)
+    ? customerId
+    : undefined;
+
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold">New job</h1>
@@ -31,7 +38,7 @@ export default async function NewJobPage({
           <JobForm
             customers={customers}
             techs={techs}
-            defaultCustomerId={customerId}
+            defaultCustomerId={defaultCustomerId}
             action={createJob}
             submitLabel="Create job"
           />

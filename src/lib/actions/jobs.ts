@@ -68,6 +68,15 @@ async function assertAssignableTechs(userIds: string[]): Promise<string | null> 
   return null;
 }
 
+async function assertActiveCustomer(customerId: string): Promise<string | null> {
+  const customer = await db.customer.findUnique({ where: { id: customerId } });
+  if (!customer) return "Selected customer no longer exists";
+  if (customer.archivedAt) {
+    return `"${customer.name}" is archived — restore them before creating a new job`;
+  }
+  return null;
+}
+
 export async function createJob(
   _prevState: FormState,
   formData: FormData,
@@ -80,6 +89,9 @@ export async function createJob(
     const data = parseJobForm(formData);
     assignedToIds = data.assignedToIds;
     const jobData = toJobData(data);
+
+    const customerError = await assertActiveCustomer(jobData.customerId);
+    if (customerError) return { error: customerError };
 
     const assignableError = await assertAssignableTechs(assignedToIds);
     if (assignableError) return { error: assignableError };
@@ -187,6 +199,11 @@ export async function updateJob(
       assignedToIds = data.assignedToIds;
       jobData = toJobData(data);
 
+      if (jobData.customerId !== existing.customerId) {
+        const customerError = await assertActiveCustomer(jobData.customerId);
+        if (customerError) return { error: customerError };
+      }
+
       const assignableError = await assertAssignableTechs(assignedToIds);
       if (assignableError) return { error: assignableError };
 
@@ -267,6 +284,10 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
 
   if (user.role === "TECH" && !assignedUserIds.includes(user.id)) {
     throw new Error("Not authorized");
+  }
+
+  if (user.role === "TECH" && status === "CANCELLED") {
+    throw new Error("Only an admin or dispatcher can cancel a job");
   }
 
   const stateError = assertValidJobState({

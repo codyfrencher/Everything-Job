@@ -67,6 +67,24 @@ export default async function AuditPage() {
   const jobTitleById = new Map(jobs.map((j) => [j.id, j.title]));
   const userNameById = new Map(users.map((u) => [u.id, u.name]));
 
+  const rows = entries.map((entry) => {
+    const jobTitle = entry.jobId ? jobTitleById.get(entry.jobId) : null;
+    const meta = entry.metadata as { source?: string } | null;
+    const actorName = entry.actorId
+      ? (userNameById.get(entry.actorId) ?? "Unknown")
+      : meta?.source === "leadconnector"
+        ? "LeadConnector"
+        : "—";
+    return {
+      entry,
+      when: formatInTimeZone(entry.createdAt, COMPANY_TIME_ZONE, "MMM d, h:mm a"),
+      action: ACTION_LABELS[entry.action] ?? entry.action,
+      jobTitle,
+      actorName,
+      details: formatDetails(entry.action, entry.metadata, userNameById),
+    };
+  });
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Audit log</h1>
@@ -76,58 +94,81 @@ export default async function AuditPage() {
           <CardTitle>Recent job activity</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {entries.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
               No activity recorded yet.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>By</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((entry) => {
-                  const jobTitle = entry.jobId ? jobTitleById.get(entry.jobId) : null;
-                  const meta = entry.metadata as { source?: string } | null;
-                  const actorName = entry.actorId
-                    ? (userNameById.get(entry.actorId) ?? "Unknown")
-                    : meta?.source === "leadconnector"
-                      ? "LeadConnector"
-                      : "—";
-                  const details = formatDetails(entry.action, entry.metadata, userNameById);
-
-                  return (
-                    <TableRow key={entry.id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {formatInTimeZone(entry.createdAt, COMPANY_TIME_ZONE, "MMM d, h:mm a")}
-                      </TableCell>
-                      <TableCell>{ACTION_LABELS[entry.action] ?? entry.action}</TableCell>
-                      <TableCell>
-                        {entry.jobId ? (
-                          jobTitle ? (
-                            <Link href={`/jobs/${entry.jobId}`} className="hover:underline">
-                              {jobTitle}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">Deleted job</span>
-                          )
+            <>
+              {/* Mobile: stacked cards */}
+              <div className="space-y-3 p-4 md:hidden">
+                {rows.map(({ entry, when, action, jobTitle, actorName, details }) => (
+                  <div key={entry.id} className="rounded-lg border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{action}</span>
+                      <span className="text-xs text-muted-foreground">{when}</span>
+                    </div>
+                    <p className="mt-1 text-muted-foreground">
+                      {entry.jobId ? (
+                        jobTitle ? (
+                          <Link href={`/jobs/${entry.jobId}`} className="hover:underline">
+                            {jobTitle}
+                          </Link>
                         ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{actorName}</TableCell>
-                      <TableCell className="text-muted-foreground">{details ?? "—"}</TableCell>
+                          "Deleted job"
+                        )
+                      ) : (
+                        "—"
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      By {actorName}
+                      {details ? ` · ${details}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Job</TableHead>
+                      <TableHead>By</TableHead>
+                      <TableHead>Details</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map(({ entry, when, action, jobTitle, actorName, details }) => (
+                      <TableRow key={entry.id}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {when}
+                        </TableCell>
+                        <TableCell>{action}</TableCell>
+                        <TableCell>
+                          {entry.jobId ? (
+                            jobTitle ? (
+                              <Link href={`/jobs/${entry.jobId}`} className="hover:underline">
+                                {jobTitle}
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground">Deleted job</span>
+                            )
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{actorName}</TableCell>
+                        <TableCell className="text-muted-foreground">{details ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

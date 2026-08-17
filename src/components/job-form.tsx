@@ -109,11 +109,16 @@ export function JobForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              {Object.entries(statusLabels)
+                .filter(
+                  ([value]) =>
+                    value !== "CANCELLED" || !readOnly || job?.status === "CANCELLED",
+                )
+                .map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>

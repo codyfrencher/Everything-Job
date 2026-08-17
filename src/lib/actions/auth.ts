@@ -30,12 +30,24 @@ async function isRateLimited(email: string, ip: string | null) {
   return count >= MAX_ATTEMPTS;
 }
 
+function safeRedirectTarget(value: FormDataEntryValue | null): string {
+  const target = String(value ?? "");
+  // Only ever follow a same-site relative path — a leading "//" or "/\"
+  // would be browser-interpreted as protocol-relative and hand the
+  // post-login redirect to an arbitrary external host.
+  if (target.startsWith("/") && !target.startsWith("//") && !target.startsWith("/\\")) {
+    return target;
+  }
+  return "/";
+}
+
 export async function loginAction(
   _prevState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
   const email = String(formData.get("email") ?? "");
   const ip = await getClientIp();
+  const redirectTo = safeRedirectTarget(formData.get("callbackUrl"));
 
   if (await isRateLimited(email, ip)) {
     return { error: "Too many attempts, try again shortly" };
@@ -45,7 +57,7 @@ export async function loginAction(
     await signIn("credentials", {
       email,
       password: formData.get("password"),
-      redirectTo: "/",
+      redirectTo,
     });
   } catch (err) {
     if (err instanceof AuthError) {

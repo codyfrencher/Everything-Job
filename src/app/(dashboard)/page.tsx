@@ -137,7 +137,7 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   {canUpdateStatus(job) ? (
-                    <JobStatusSelect jobId={job.id} status={job.status} />
+                    <JobStatusSelect jobId={job.id} status={job.status} hideCancel={isTech} />
                   ) : (
                     <JobStatusBadge status={job.status} />
                   )}

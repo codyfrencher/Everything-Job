@@ -11,6 +11,26 @@ import { userSchema } from "@/lib/validators";
 
 export type FormState = { error?: string } | undefined;
 
+export type PasswordResetState = { error?: string; success?: boolean } | undefined;
+
+export async function resetTeamMemberPassword(
+  userId: string,
+  _prevState: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  await requireRole("ADMIN");
+
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters" };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await db.user.update({ where: { id: userId }, data: { passwordHash } });
+
+  return { success: true };
+}
+
 export async function createTeamMember(
   _prevState: FormState,
   formData: FormData,

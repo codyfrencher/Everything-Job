@@ -23,6 +23,24 @@ function parseCustomerForm(formData: FormData) {
   });
 }
 
+async function findLikelyDuplicate(
+  name: string,
+  email: string | undefined,
+  phone: string | undefined,
+) {
+  if (!email && !phone) return null;
+  return db.customer.findFirst({
+    where: {
+      archivedAt: null,
+      name: { equals: name, mode: "insensitive" },
+      OR: [
+        ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
+        ...(phone ? [{ phone }] : []),
+      ],
+    },
+  });
+}
+
 export async function createCustomer(
   _prevState: FormState,
   formData: FormData,
@@ -32,6 +50,14 @@ export async function createCustomer(
   let customer;
   try {
     const data = parseCustomerForm(formData);
+
+    const duplicate = await findLikelyDuplicate(data.name, data.email, data.phone);
+    if (duplicate) {
+      return {
+        error: `A customer named "${duplicate.name}" already exists with the same email or phone — search for them instead of creating a new one.`,
+      };
+    }
+
     customer = await db.customer.create({
       data: { ...data, createdById: user.id },
     });
