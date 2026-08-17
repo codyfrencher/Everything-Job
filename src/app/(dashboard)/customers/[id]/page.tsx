@@ -48,9 +48,11 @@ export default async function CustomerDetailPage({
           {isArchived && <Badge variant="secondary">Archived</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button asChild>
-            <Link href={`/jobs/new?customerId=${customer.id}`}>New job</Link>
-          </Button>
+          {isArchived ? null : (
+            <Button asChild>
+              <Link href={`/jobs/new?customerId=${customer.id}`}>New job</Link>
+            </Button>
+          )}
           {isArchived ? (
             <form action={restoreCustomerWithId}>
               <Button type="submit" variant="outline" size="sm">

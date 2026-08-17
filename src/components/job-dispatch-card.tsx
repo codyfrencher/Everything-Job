@@ -164,6 +164,7 @@ export function JobDispatchCard({
                 jobId={job.id}
                 status={job.status}
                 className="flex-1"
+                hideCancel={!canAssign}
               />
             ) : null}
           </div>

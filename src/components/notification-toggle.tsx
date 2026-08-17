@@ -17,6 +17,7 @@ type Status = "unsupported" | "checking" | "off" | "on";
 export function NotificationToggle() {
   const [status, setStatus] = useState<Status>("checking");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function check() {
@@ -38,10 +39,16 @@ export function NotificationToggle() {
 
   async function enable() {
     setBusy(true);
+    setError(null);
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setStatus("off");
+        setError(
+          permission === "denied"
+            ? "Notifications are blocked for this site in your browser settings."
+            : "Permission request was dismissed — try again to enable notifications.",
+        );
         return;
       }
       const registration = await navigator.serviceWorker.ready;
@@ -59,6 +66,7 @@ export function NotificationToggle() {
     } catch (err) {
       console.error("Push subscribe failed", err);
       setStatus("off");
+      setError("Couldn't turn on notifications. Try again in a moment.");
     } finally {
       setBusy(false);
     }
@@ -66,6 +74,7 @@ export function NotificationToggle() {
 
   async function disable() {
     setBusy(true);
+    setError(null);
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -82,14 +91,21 @@ export function NotificationToggle() {
   if (status === "unsupported" || status === "checking") return null;
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      disabled={busy}
-      onClick={status === "on" ? disable : enable}
-    >
-      {status === "on" ? "🔔 Notifications on" : "🔕 Enable notifications"}
-    </Button>
+    <div className="relative">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={busy}
+        onClick={status === "on" ? disable : enable}
+      >
+        {status === "on" ? "🔔 Notifications on" : "🔕 Enable notifications"}
+      </Button>
+      {error ? (
+        <p className="absolute top-full right-0 z-20 mt-1 w-56 rounded-md border bg-popover p-2 text-xs text-destructive shadow-md">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
