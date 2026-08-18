@@ -22,8 +22,10 @@ export type ImportCandidate = {
   address: string | null;
   startTime: string;
   endTime: string;
-  status: "new" | "already_imported" | "possible_duplicate";
+  status: "new" | "already_imported" | "possible_duplicate" | "time_changed";
   duplicateJobId?: string;
+  previousStartTime?: string;
+  previousEndTime?: string;
 };
 
 export type PreviewResult =
@@ -34,6 +36,12 @@ export type PreviewResult =
 // window of the proposed appointment time — most likely the same job
 // came in earlier through the real-time webhook or was entered by hand.
 const DUPLICATE_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+// LeadConnector doesn't re-fire the real-time webhook when an existing
+// confirmed appointment is simply rescheduled (its status never changes),
+// so an already-imported job can silently drift out of date. A minute of
+// slack avoids flagging float from clock/serialization noise.
+const TIME_DRIFT_TOLERANCE_MS = 60 * 1000;
 
 export async function previewLeadConnectorImport(): Promise<PreviewResult> {
   await requireRole("ADMIN");
@@ -53,9 +61,19 @@ export async function previewLeadConnectorImport(): Promise<PreviewResult> {
   for (const event of importable) {
     const existingByExternalId = await db.job.findUnique({
       where: { externalId: event.id },
-      select: { id: true },
+      select: { id: true, scheduledStart: true, scheduledEnd: true },
     });
     if (existingByExternalId) {
+      const startDrifted =
+        Math.abs(
+          (existingByExternalId.scheduledStart?.getTime() ?? 0) -
+            new Date(event.startTime).getTime(),
+        ) > TIME_DRIFT_TOLERANCE_MS;
+      const endDrifted =
+        Math.abs(
+          (existingByExternalId.scheduledEnd?.getTime() ?? 0) - new Date(event.endTime).getTime(),
+        ) > TIME_DRIFT_TOLERANCE_MS;
+
       candidates.push({
         eventId: event.id,
         title: event.title,
@@ -64,8 +82,10 @@ export async function previewLeadConnectorImport(): Promise<PreviewResult> {
         address: event.address ?? null,
         startTime: event.startTime,
         endTime: event.endTime,
-        status: "already_imported",
+        status: startDrifted || endDrifted ? "time_changed" : "already_imported",
         duplicateJobId: existingByExternalId.id,
+        previousStartTime: existingByExternalId.scheduledStart?.toISOString(),
+        previousEndTime: existingByExternalId.scheduledEnd?.toISOString(),
       });
       continue;
     }
@@ -109,13 +129,13 @@ export async function previewLeadConnectorImport(): Promise<PreviewResult> {
 
 export type ImportRunResult =
   | { error: string }
-  | { created: number; skipped: number; failed: { eventId: string; error: string }[] };
+  | { created: number; updated: number; skipped: number; failed: { eventId: string; error: string }[] };
 
 export async function runLeadConnectorImport(eventIds: string[]): Promise<ImportRunResult> {
   const user = await requireRole("ADMIN");
 
   if (eventIds.length === 0) {
-    return { created: 0, skipped: 0, failed: [] };
+    return { created: 0, updated: 0, skipped: 0, failed: [] };
   }
 
   let events;
@@ -128,6 +148,7 @@ export async function runLeadConnectorImport(eventIds: string[]): Promise<Import
 
   const eventsById = new Map(events.map((e) => [e.id, e]));
   let created = 0;
+  let updated = 0;
   let skipped = 0;
   const failed: { eventId: string; error: string }[] = [];
 
@@ -138,9 +159,35 @@ export async function runLeadConnectorImport(eventIds: string[]): Promise<Import
       continue;
     }
 
-    const alreadyImported = await db.job.findUnique({ where: { externalId: event.id } });
-    if (alreadyImported) {
-      skipped++;
+    const existing = await db.job.findUnique({ where: { externalId: event.id } });
+    if (existing) {
+      const newStart = new Date(event.startTime);
+      const newEnd = new Date(event.endTime);
+      const unchanged =
+        existing.scheduledStart?.getTime() === newStart.getTime() &&
+        existing.scheduledEnd?.getTime() === newEnd.getTime();
+      if (unchanged) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        await db.job.update({
+          where: { id: existing.id },
+          data: { scheduledStart: newStart, scheduledEnd: newEnd },
+        });
+        await logJobAudit("edited", existing.id, user.id, {
+          source: "leadconnector-import",
+          reason: "rescheduled in LeadConnector",
+        });
+        updated++;
+      } catch (err) {
+        console.error("runLeadConnectorImport: update failed for event", eventId, err);
+        failed.push({
+          eventId,
+          error: err instanceof Error ? err.message : "Could not update job",
+        });
+      }
       continue;
     }
 
@@ -199,12 +246,12 @@ export async function runLeadConnectorImport(eventIds: string[]): Promise<Import
     }
   }
 
-  if (created > 0) {
+  if (created > 0 || updated > 0) {
     revalidatePath("/jobs");
     revalidatePath("/schedule");
     revalidatePath("/");
     revalidatePath("/customers");
   }
 
-  return { created, skipped, failed };
+  return { created, updated, skipped, failed };
 }
