@@ -24,6 +24,13 @@ const payloadSchema = z.object({
   jobDescription: z.string().optional(),
   scheduledStart: z.string().optional(),
   scheduledEnd: z.string().optional(),
+  // Not yet sent by the LeadConnector workflow as of this writing — once
+  // a "appointmentId" Custom Data field (merge tag {{appointment.id}}) is
+  // added to the Webhook action, this lets the same appointment be
+  // recognized across multiple webhook fires (LeadConnector re-fires this
+  // workflow on every edit to a matching appointment, not just once on
+  // creation) instead of creating a fresh job each time.
+  appointmentId: z.string().optional(),
 });
 
 // LeadConnector renders an empty merge field as the literal text
@@ -121,6 +128,7 @@ export async function POST(request: Request) {
   const zip = cleanField(data.zip);
   const jobTitle = cleanField(data.jobTitle);
   const jobDescription = cleanField(data.jobDescription);
+  const appointmentId = cleanField(data.appointmentId);
 
   const scheduledStart = parseLeadConnectorDate(data.scheduledStart);
   const scheduledEnd = parseLeadConnectorDate(data.scheduledEnd);
@@ -150,25 +158,70 @@ export async function POST(request: Request) {
       },
     });
 
-    const job = await db.job.create({
-      data: {
-        title: jobTitle || `New lead: ${data.name}`,
-        description: jobDescription,
-        customerId: customer.id,
-        status: scheduledStart ? "SCHEDULED" : "UNSCHEDULED",
-        scheduledStart,
-        scheduledEnd,
-        street: street || customer.street,
-        city: city || customer.city,
-        state: state || customer.state || "FL",
-        zip: zip || customer.zip,
-      },
-    });
+    const title = jobTitle || `New lead: ${data.name}`;
+    const jobFields = {
+      title,
+      description: jobDescription,
+      status: scheduledStart ? ("SCHEDULED" as const) : ("UNSCHEDULED" as const),
+      scheduledStart,
+      scheduledEnd,
+      street: street || customer.street,
+      city: city || customer.city,
+      state: state || customer.state || "FL",
+      zip: zip || customer.zip,
+    };
 
-    await logJobAudit("created", job.id, null, {
-      source: "leadconnector",
-      contactId: data.contactId,
-    });
+    // LeadConnector re-fires this workflow on every edit to a matching
+    // appointment, not just once when it's first booked — a reschedule
+    // fires it again with the same appointment, so this has to recognize
+    // "already have a job for this" rather than blindly creating another.
+    let existing = appointmentId
+      ? await db.job.findUnique({ where: { externalId: appointmentId } })
+      : null;
+
+    // Until the LeadConnector workflow is updated to send an appointment
+    // id, fall back to a same-customer/same-title/nearby-time match so a
+    // re-fired edit still updates in place instead of duplicating. The
+    // window has to be generous — a reschedule can move an appointment by
+    // more than a day (the bug this is fixing moved one by 24 hours) — but
+    // requiring an exact title match keeps it from merging a customer's
+    // genuinely separate multi-day jobs ("day 1 of 2" vs "day 2 of 2") or,
+    // for a repeat customer, an unrelated job booked under the same title
+    // much later.
+    if (!existing && scheduledStart) {
+      const windowMs = 30 * 24 * 60 * 60 * 1000;
+      existing = await db.job.findFirst({
+        where: {
+          customerId: customer.id,
+          title,
+          scheduledStart: {
+            gte: new Date(scheduledStart.getTime() - windowMs),
+            lte: new Date(scheduledStart.getTime() + windowMs),
+          },
+        },
+      });
+    }
+
+    let job;
+    if (existing) {
+      job = await db.job.update({
+        where: { id: existing.id },
+        data: { ...jobFields, externalId: appointmentId || existing.externalId },
+      });
+      await logJobAudit("edited", job.id, null, {
+        source: "leadconnector",
+        contactId: data.contactId,
+        reason: "webhook re-fire for the same appointment",
+      });
+    } else {
+      job = await db.job.create({
+        data: { ...jobFields, customerId: customer.id, externalId: appointmentId },
+      });
+      await logJobAudit("created", job.id, null, {
+        source: "leadconnector",
+        contactId: data.contactId,
+      });
+    }
 
     revalidatePath("/jobs");
     revalidatePath("/schedule");
