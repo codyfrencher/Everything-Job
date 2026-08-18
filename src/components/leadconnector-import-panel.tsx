@@ -37,7 +37,13 @@ export function LeadConnectorImportPanel() {
       return;
     }
     setCandidates(res.candidates);
-    setSelected(new Set(res.candidates.filter((c) => c.status === "new").map((c) => c.eventId)));
+    setSelected(
+      new Set(
+        res.candidates
+          .filter((c) => c.status === "new" || c.status === "time_changed")
+          .map((c) => c.eventId),
+      ),
+    );
   }
 
   function toggle(eventId: string) {
@@ -62,7 +68,8 @@ export function LeadConnectorImportPanel() {
     await loadPreview();
   }
 
-  const selectable = candidates?.filter((c) => c.status !== "already_imported") ?? [];
+  const reviewable = candidates?.filter((c) => c.status !== "already_imported") ?? [];
+  const alreadyImported = candidates?.filter((c) => c.status === "already_imported") ?? [];
 
   return (
     <div className="space-y-4">
@@ -81,7 +88,7 @@ export function LeadConnectorImportPanel() {
             onClick={doImport}
             disabled={loading || selected.size === 0}
           >
-            {loading ? "Importing..." : `Import ${selected.size} selected`}
+            {loading ? "Working..." : `Apply ${selected.size} selected`}
           </Button>
         </div>
       )}
@@ -91,7 +98,8 @@ export function LeadConnectorImportPanel() {
       {result ? (
         <div className="rounded-lg border bg-muted/30 p-3 text-sm">
           <p className="font-medium">
-            Created {result.created}, skipped {result.skipped} already-imported.
+            Created {result.created}, updated {result.updated}, skipped {result.skipped}{" "}
+            already up to date.
           </p>
           {result.failed.length > 0 ? (
             <ul className="mt-1 list-inside list-disc text-destructive">
@@ -111,62 +119,71 @@ export function LeadConnectorImportPanel() {
         </p>
       ) : null}
 
-      {selectable.length > 0 ? (
+      {reviewable.length > 0 ? (
         <div className="space-y-2">
-          {candidates!
-            .filter((c) => c.status !== "already_imported")
-            .map((c) => (
-              <label
-                key={c.eventId}
-                className="flex items-start gap-3 rounded-lg border p-3 text-sm has-checked:border-foreground/40"
-              >
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-input"
-                  checked={selected.has(c.eventId)}
-                  onChange={() => toggle(c.eventId)}
-                />
-                <div className="flex-1 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{c.title}</span>
-                    {c.status === "possible_duplicate" ? (
-                      <Badge variant="secondary">Possibly already in Fieldwork</Badge>
-                    ) : null}
-                  </div>
+          {reviewable.map((c) => (
+            <label
+              key={c.eventId}
+              className="flex items-start gap-3 rounded-lg border p-3 text-sm has-checked:border-foreground/40"
+            >
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-input"
+                checked={selected.has(c.eventId)}
+                onChange={() => toggle(c.eventId)}
+              />
+              <div className="flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{c.title}</span>
+                  {c.status === "possible_duplicate" ? (
+                    <Badge variant="secondary">Possibly already in Fieldwork</Badge>
+                  ) : null}
+                  {c.status === "time_changed" ? (
+                    <Badge variant="secondary">Rescheduled in LeadConnector</Badge>
+                  ) : null}
+                </div>
+                {c.status === "time_changed" && c.previousStartTime ? (
+                  <p className="text-muted-foreground">
+                    {c.customerName} ·{" "}
+                    <span className="line-through">{formatWhen(c.previousStartTime)}</span>{" "}
+                    → {formatWhen(c.startTime)}
+                    {c.address ? ` · ${c.address}` : ""}
+                  </p>
+                ) : (
                   <p className="text-muted-foreground">
                     {c.customerName} · {formatWhen(c.startTime)}
                     {c.address ? ` · ${c.address}` : ""}
                   </p>
-                  {c.status === "possible_duplicate" && c.duplicateJobId ? (
-                    <Link
-                      href={`/jobs/${c.duplicateJobId}`}
-                      className="text-xs text-muted-foreground underline"
-                    >
-                      View the existing job this might match
-                    </Link>
-                  ) : null}
-                </div>
-              </label>
-            ))}
+                )}
+                {(c.status === "possible_duplicate" || c.status === "time_changed") &&
+                c.duplicateJobId ? (
+                  <Link
+                    href={`/jobs/${c.duplicateJobId}`}
+                    className="text-xs text-muted-foreground underline"
+                  >
+                    View the existing job
+                  </Link>
+                ) : null}
+              </div>
+            </label>
+          ))}
         </div>
       ) : null}
 
-      {candidates && candidates.some((c) => c.status === "already_imported") ? (
+      {alreadyImported.length > 0 ? (
         <details className="text-sm text-muted-foreground">
           <summary className="cursor-pointer">
-            {candidates.filter((c) => c.status === "already_imported").length} already imported
+            {alreadyImported.length} already imported and up to date
           </summary>
           <ul className="mt-2 space-y-1">
-            {candidates
-              .filter((c) => c.status === "already_imported")
-              .map((c) => (
-                <li key={c.eventId}>
-                  {c.title} · {formatWhen(c.startTime)} —{" "}
-                  <Link href={`/jobs/${c.duplicateJobId}`} className="underline">
-                    view job
-                  </Link>
-                </li>
-              ))}
+            {alreadyImported.map((c) => (
+              <li key={c.eventId}>
+                {c.title} · {formatWhen(c.startTime)} —{" "}
+                <Link href={`/jobs/${c.duplicateJobId}`} className="underline">
+                  view job
+                </Link>
+              </li>
+            ))}
           </ul>
         </details>
       ) : null}
