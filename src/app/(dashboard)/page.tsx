@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
-import { auth } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
 import { db } from "@/lib/db";
 import {
   Card,
@@ -23,8 +23,7 @@ const STATUS_ORDER: JobStatus[] = [
 ];
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await requireUser();
   const isTech = user.role === "TECH";
   const canUpdateStatus = (job: { assignments: { userId: string }[] }) =>
     !isTech || job.assignments.some((a) => a.userId === user.id);

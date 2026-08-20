@@ -37,7 +37,14 @@ export default async function JobDetailPage({
       orderBy: { name: "asc" },
     }),
     db.user.findMany({
-      where: { role: "TECH" },
+      // Include a deactivated tech only if they're already assigned to
+      // this job, so an existing assignment doesn't silently disappear
+      // (and get dropped on save) just because the form no longer lists
+      // them as an assignable option.
+      where: {
+        role: "TECH",
+        OR: [{ deactivatedAt: null }, { id: { in: assignedUserIds } }],
+      },
       orderBy: { name: "asc" },
     }),
   ]);
