@@ -272,6 +272,55 @@ export async function updateJob(
   revalidatePath("/");
 }
 
+async function assertJobAccess(jobId: string) {
+  const user = await requireUser();
+  const existing = await db.job.findUnique({
+    where: { id: jobId },
+    include: { assignments: true },
+  });
+  if (!existing) throw new Error("Job not found");
+  if (
+    user.role === "TECH" &&
+    !existing.assignments.some((a) => a.userId === user.id)
+  ) {
+    throw new Error("Not authorized");
+  }
+  return { user, existing };
+}
+
+// Notes is the one field both a Tech and an Admin/Dispatcher can edit
+// directly, independent of everything else on the job — split out from
+// the big updateJob form so saving a note doesn't require resubmitting
+// (or being blocked from touching) every other field on the job.
+export async function updateJobNotes(jobId: string, notes: string) {
+  const { user } = await assertJobAccess(jobId);
+
+  await db.job.update({ where: { id: jobId }, data: { notes: notes || null } });
+  await logJobAudit("edited", jobId, user.id, { field: "notes" });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/jobs");
+}
+
+// Scope of work is the job's `description` field, editable only by
+// Admin/Dispatcher — a Tech reads it but never submits it, same as the
+// full job form already enforces via techJobUpdateSchema.
+export async function updateJobScope(jobId: string, description: string) {
+  const user = await requireRole("ADMIN", "DISPATCHER");
+
+  const existing = await db.job.findUnique({ where: { id: jobId } });
+  if (!existing) throw new Error("Job not found");
+
+  await db.job.update({
+    where: { id: jobId },
+    data: { description: description || null },
+  });
+  await logJobAudit("edited", jobId, user.id, { field: "description" });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/jobs");
+}
+
 export async function updateJobStatus(jobId: string, status: JobStatus) {
   const user = await requireUser();
 
