@@ -18,8 +18,17 @@ export function JobPhotos({
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleDelete(photoId: string) {
+    if (!window.confirm("Delete this photo? This can't be undone.")) return;
+    setDeletingId(photoId);
+    startTransition(() => {
+      deleteJobPhoto(photoId).finally(() => setDeletingId(null));
+    });
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -50,7 +59,7 @@ export function JobPhotos({
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {photos.map((photo) => (
-            <div key={photo.id} className="group relative aspect-square">
+            <div key={photo.id} className="relative aspect-square">
               <a href={photo.url} target="_blank" rel="noreferrer">
                 <Image
                   src={photo.url}
@@ -63,15 +72,12 @@ export function JobPhotos({
               {canDelete ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    startTransition(() => {
-                      deleteJobPhoto(photo.id);
-                    })
-                  }
-                  disabled={isPending}
-                  className="absolute top-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label="Delete photo"
+                  onClick={() => handleDelete(photo.id)}
+                  disabled={deletingId === photo.id}
+                  className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white shadow-sm disabled:opacity-50"
                 >
-                  ✕
+                  {deletingId === photo.id ? "…" : "✕"}
                 </button>
               ) : null}
             </div>
@@ -79,7 +85,7 @@ export function JobPhotos({
         </div>
       )}
 
-      <div>
+      <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
           type="file"
@@ -98,8 +104,13 @@ export function JobPhotos({
         >
           {uploading ? "Uploading..." : "Add photo"}
         </Button>
-        {error ? <p className="mt-1 text-sm text-destructive">{error}</p> : null}
+        {photos.length > 0 ? (
+          <Button asChild type="button" variant="outline" size="sm">
+            <a href={`/api/jobs/${jobId}/photos/export`}>Download all</a>
+          </Button>
+        ) : null}
       </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }
