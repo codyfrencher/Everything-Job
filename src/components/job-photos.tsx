@@ -79,7 +79,7 @@ export function JobPhotos({
         </div>
       )}
 
-      <div>
+      <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
           type="file"
@@ -98,8 +98,13 @@ export function JobPhotos({
         >
           {uploading ? "Uploading..." : "Add photo"}
         </Button>
-        {error ? <p className="mt-1 text-sm text-destructive">{error}</p> : null}
+        {photos.length > 0 ? (
+          <Button asChild type="button" variant="outline" size="sm">
+            <a href={`/api/jobs/${jobId}/photos/export`}>Download all</a>
+          </Button>
+        ) : null}
       </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }
