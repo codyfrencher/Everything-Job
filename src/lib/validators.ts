@@ -47,3 +47,10 @@ export const userSchema = z.object({
   role: z.enum(["ADMIN", "DISPATCHER", "TECH"]),
   phone: z.string().optional().or(z.literal("")),
 });
+
+export const editUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  role: z.enum(["ADMIN", "DISPATCHER", "TECH"]),
+  phone: z.string().optional().or(z.literal("")),
+});
