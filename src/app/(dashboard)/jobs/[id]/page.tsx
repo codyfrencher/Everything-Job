@@ -1,14 +1,26 @@
 import { notFound } from "next/navigation";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
-import { updateJob, deleteJob } from "@/lib/actions/jobs";
+import { deleteJob } from "@/lib/actions/jobs";
 import { directionsUrl } from "@/lib/maps";
-import { JobForm } from "@/components/job-form";
+import { COMPANY_TIME_ZONE } from "@/lib/timezone";
+import { JobStatusPills } from "@/components/job-status-pills";
+import { JobInfoPanel } from "@/components/job-info-panel";
+import { JobScopeControl } from "@/components/job-scope-control";
+import { JobNotesControl } from "@/components/job-notes-control";
+import { JobOverflowMenu } from "@/components/job-overflow-menu";
 import { JobPhotos } from "@/components/job-photos";
-import { DeleteButton } from "@/components/delete-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+function formatSchedule(start: Date | null, end: Date | null): string | null {
+  if (!start) return null;
+  const startLabel = formatInTimeZone(start, COMPANY_TIME_ZONE, "EEE, MMM d 'at' h:mm a");
+  if (!end) return startLabel;
+  return `${startLabel} – ${formatInTimeZone(end, COMPANY_TIME_ZONE, "h:mm a")}`;
+}
 
 export default async function JobDetailPage({
   params,
@@ -21,6 +33,7 @@ export default async function JobDetailPage({
   const job = await db.job.findUnique({
     where: { id },
     include: {
+      customer: true,
       photos: { orderBy: { createdAt: "desc" } },
       assignments: { select: { userId: true } },
     },
@@ -49,46 +62,58 @@ export default async function JobDetailPage({
     }),
   ]);
 
-  const updateJobWithId = updateJob.bind(null, job.id);
   const deleteJobWithId = deleteJob.bind(null, job.id);
   const directions = directionsUrl(job);
+  const scheduleLabel = formatSchedule(job.scheduledStart, job.scheduledEnd);
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold">{job.title}</h1>
+        {canManage ? <JobOverflowMenu action={deleteJobWithId} jobTitle={job.title} /> : null}
+      </div>
+
+      <JobStatusPills jobId={job.id} status={job.status} hideCancel={!canManage} />
+
+      {directions || job.customer.phone ? (
         <div className="flex gap-2">
-          {directions && (
-            <Button asChild variant="outline" size="sm">
+          {directions ? (
+            <Button asChild variant="outline" className="flex-1">
               <a href={directions} target="_blank" rel="noreferrer">
-                Get directions
+                🧭 Directions
               </a>
             </Button>
-          )}
-          {canManage && (
-            <DeleteButton
-              action={deleteJobWithId}
-              label="Delete job"
-              confirmMessage="Delete this job? This can't be undone."
-            />
-          )}
+          ) : null}
+          {job.customer.phone ? (
+            <Button asChild variant="outline" className="flex-1">
+              <a href={`tel:${job.customer.phone}`}>📞 Call customer</a>
+            </Button>
+          ) : null}
         </div>
+      ) : null}
+
+      <JobInfoPanel
+        job={job}
+        customers={customers}
+        techs={techs}
+        assignedUserIds={assignedUserIds}
+        scheduleLabel={scheduleLabel}
+        canEdit={canManage}
+      />
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Scope of work
+        </p>
+        <JobScopeControl jobId={job.id} description={job.description} canEdit={canManage} />
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Job details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <JobForm
-            job={job}
-            customers={customers}
-            techs={techs}
-            action={updateJobWithId}
-            submitLabel="Save changes"
-            readOnly={user.role === "TECH"}
-          />
-        </CardContent>
-      </Card>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Notes
+        </p>
+        <JobNotesControl jobId={job.id} notes={job.notes} />
+      </div>
 
       <Card>
         <CardHeader>
