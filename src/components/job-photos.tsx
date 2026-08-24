@@ -118,7 +118,11 @@ export function JobPhotos({
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          // No `capture` attribute here on purpose — setting one (even
+          // "environment") makes mobile browsers jump straight into the
+          // camera for a single shot and ignore `multiple` entirely.
+          // Without it, the native picker shows both "Take Photo" and
+          // "Photo Library" (multi-select) as separate options.
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
