@@ -17,10 +17,16 @@ export function JobPhotos({
   canDelete: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Upload a few at once instead of fully sequentially — a tech dumping a
+  // whole camera roll on a job shouldn't wait for each photo's full round
+  // trip before the next one even starts.
+  const UPLOAD_CONCURRENCY = 3;
 
   function handleDelete(photoId: string) {
     if (!window.confirm("Delete this photo? This can't be undone.")) return;
@@ -32,23 +38,45 @@ export function JobPhotos({
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const fileList = Array.from(files);
     setError(null);
     setUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.set("file", file);
-        const result = await uploadJobPhoto(jobId, formData);
-        if (result?.error) {
-          setError(result.error);
-          break;
-        }
-      }
-    } catch {
-      setError("Couldn't upload photo. Try again.");
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
+    setProgress({ done: 0, total: fileList.length });
+
+    let completed = 0;
+    const failures: string[] = [];
+
+    for (let i = 0; i < fileList.length; i += UPLOAD_CONCURRENCY) {
+      const batch = fileList.slice(i, i + UPLOAD_CONCURRENCY);
+      await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const formData = new FormData();
+            formData.set("file", file);
+            const result = await uploadJobPhoto(jobId, formData);
+            if (result?.error) failures.push(`${file.name}: ${result.error}`);
+          } catch {
+            failures.push(`${file.name}: couldn't upload`);
+          } finally {
+            completed += 1;
+            setProgress({ done: completed, total: fileList.length });
+          }
+        }),
+      );
+    }
+
+    setUploading(false);
+    setProgress(null);
+    if (inputRef.current) inputRef.current.value = "";
+
+    if (failures.length > 0) {
+      const succeeded = fileList.length - failures.length;
+      const more = failures.length > 1 ? ` (+${failures.length - 1} more)` : "";
+      setError(
+        succeeded > 0
+          ? `${succeeded} of ${fileList.length} uploaded. ${failures[0]}${more}`
+          : `${failures[0]}${more}`,
+      );
     }
   }
 
@@ -98,14 +126,15 @@ export function JobPhotos({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="lg"
+          className="flex-1"
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          {uploading ? "Uploading..." : "Add photo"}
+          {progress ? `Uploading ${progress.done} of ${progress.total}...` : "Add photos"}
         </Button>
         {photos.length > 0 ? (
-          <Button asChild type="button" variant="outline" size="sm">
+          <Button asChild type="button" variant="outline" size="lg" className="flex-1">
             <a href={`/api/jobs/${jobId}/photos/export`}>Download all</a>
           </Button>
         ) : null}
