@@ -127,6 +127,9 @@ export async function fetchEstimateDiagnostic(contactId: string): Promise<{
   url.searchParams.set("altType", "location");
   url.searchParams.set("contactId", contactId);
   url.searchParams.set("limit", "10");
+  // Required even for a first page — the API rejected the request
+  // outright ("offset must be a string") without it.
+  url.searchParams.set("offset", "0");
 
   const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
   const body = await res.text();
