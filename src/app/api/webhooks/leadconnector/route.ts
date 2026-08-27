@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logJobAudit } from "@/lib/audit";
 import { assertValidTimeRange } from "@/lib/job-rules";
+import { fetchScopeOfWorkFromEstimate } from "@/lib/leadconnector-api";
 import { COMPANY_TIME_ZONE } from "@/lib/timezone";
 
 const payloadSchema = z.object({
@@ -214,8 +215,15 @@ export async function POST(request: Request) {
         reason: "webhook re-fire for the same appointment",
       });
     } else {
+      // Explicit Custom Data wins if the workflow ever sends jobDescription;
+      // otherwise fall back to the customer's LeadConnector estimate. Only
+      // on create — an existing job's Scope of Work may have since been
+      // hand-edited in Fieldwork, and a re-fired webhook shouldn't clobber
+      // that on every appointment edit.
+      const description = jobFields.description ?? (await fetchScopeOfWorkFromEstimate(data.contactId));
+
       job = await db.job.create({
-        data: { ...jobFields, customerId: customer.id, externalId: appointmentId },
+        data: { ...jobFields, description, customerId: customer.id, externalId: appointmentId },
       });
       await logJobAudit("created", job.id, null, {
         source: "leadconnector",

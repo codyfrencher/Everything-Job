@@ -8,6 +8,7 @@ import { logJobAudit } from "@/lib/audit";
 import {
   contactDisplayName,
   fetchContact,
+  fetchScopeOfWorkFromEstimate,
   fetchUpcomingEvents,
   isImportableEvent,
   normalizeState,
@@ -216,9 +217,12 @@ export async function runLeadConnectorImport(eventIds: string[]): Promise<Import
         },
       });
 
+      const description = await fetchScopeOfWorkFromEstimate(event.contactId);
+
       const job = await db.job.create({
         data: {
           title: event.title,
+          description,
           customerId: customer.id,
           status: "SCHEDULED",
           scheduledStart: new Date(event.startTime),
