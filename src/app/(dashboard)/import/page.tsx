@@ -1,17 +1,9 @@
-import { db } from "@/lib/db";
 import { requireRole } from "@/lib/require-user";
 import { LeadConnectorImportPanel } from "@/components/leadconnector-import-panel";
-import { LeadConnectorEstimateDiagnostic } from "@/components/leadconnector-estimate-diagnostic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function ImportPage() {
   await requireRole("ADMIN");
-
-  const customersWithExternalId = await db.customer.findMany({
-    where: { externalId: { not: null } },
-    select: { id: true, name: true, externalId: true },
-    orderBy: { name: "asc" },
-  });
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -30,14 +22,6 @@ export default async function ImportPage() {
           <LeadConnectorImportPanel />
         </CardContent>
       </Card>
-
-      <LeadConnectorEstimateDiagnostic
-        customers={customersWithExternalId.map((c) => ({
-          id: c.id,
-          name: c.name,
-          externalId: c.externalId as string,
-        }))}
-      />
     </div>
   );
 }

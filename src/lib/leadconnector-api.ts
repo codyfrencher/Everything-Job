@@ -108,32 +108,92 @@ export function contactDisplayName(
   return name || fallback;
 }
 
-// One-off diagnostic for figuring out how Estimates actually work in this
-// account's LeadConnector API — not wired into any real feature yet. GHL's
-// own docs wouldn't render for me to confirm the endpoint shape, so this
-// hits the most likely v2 path (estimates live under /invoices/, same as
-// every other GHL v2 list endpoint scoped with altId/altType=location) and
-// returns the raw response so we can see exactly what comes back: a scope
-// error if the token can't read Invoices, or the real estimate shape if it
-// can. Once confirmed, this becomes a real typed function.
-export async function fetchEstimateDiagnostic(contactId: string): Promise<{
-  status: number;
-  ok: boolean;
-  url: string;
-  body: string;
-}> {
+type LeadConnectorEstimateItem = {
+  name?: string;
+  description?: string;
+};
+
+type LeadConnectorEstimate = {
+  _id: string;
+  issueDate?: string;
+  items?: LeadConnectorEstimateItem[];
+};
+
+// Estimate line-item descriptions are HTML ("<p>...</p>"), but Scope of
+// Work is a plain-text field — convert block-level breaks to newlines,
+// strip remaining tags, and decode the handful of entities GHL actually
+// uses in this content rather than pulling in a full HTML parser for it.
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<\/(p|div|li)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function estimateToScopeText(estimate: LeadConnectorEstimate): string | null {
+  const parts = (estimate.items ?? [])
+    .map((item) => {
+      const name = item.name?.trim();
+      const description = item.description ? htmlToPlainText(item.description) : "";
+      return [name, description].filter(Boolean).join("\n");
+    })
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join("\n\n") : null;
+}
+
+// A job's customer generally has one active estimate in LeadConnector,
+// but the API returns a list — if there's ever more than one, use
+// whichever was issued most recently. Estimate lookups are a nice-to-
+// have for pre-filling Scope of Work, not a hard requirement, so this
+// returns null instead of throwing on any failure — a broken or missing
+// estimate should never block a job from being created.
+export async function fetchScopeOfWorkFromEstimate(
+  contactId: string,
+): Promise<string | null> {
   const url = new URL(`${API_BASE}/invoices/estimate/list`);
   url.searchParams.set("altId", locationId());
   url.searchParams.set("altType", "location");
   url.searchParams.set("contactId", contactId);
   url.searchParams.set("limit", "10");
-  // Required even for a first page — the API rejected the request
+  // Required even for a first page — the API rejects the request
   // outright ("offset must be a string") without it.
   url.searchParams.set("offset", "0");
 
-  const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
-  const body = await res.text();
-  return { status: res.status, ok: res.ok, url: url.toString(), body };
+  try {
+    const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
+    if (!res.ok) {
+      console.error(
+        "fetchScopeOfWorkFromEstimate: request failed",
+        res.status,
+        await res.text(),
+      );
+      return null;
+    }
+    const data = (await res.json()) as { estimates?: LeadConnectorEstimate[] };
+    const estimates = data.estimates ?? [];
+    if (estimates.length === 0) return null;
+
+    const latest = estimates.reduce((best, current) => {
+      const bestTime = best.issueDate ? new Date(best.issueDate).getTime() : 0;
+      const currentTime = current.issueDate ? new Date(current.issueDate).getTime() : 0;
+      return currentTime > bestTime ? current : best;
+    });
+
+    return estimateToScopeText(latest);
+  } catch (err) {
+    console.error("fetchScopeOfWorkFromEstimate failed", err);
+    return null;
+  }
 }
 
 export function normalizeState(state: string | undefined): string | null {
