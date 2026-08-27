@@ -8,11 +8,30 @@ import { logJobAudit } from "@/lib/audit";
 import {
   contactDisplayName,
   fetchContact,
+  fetchEstimateDiagnostic,
   fetchUpcomingEvents,
   isImportableEvent,
   normalizeState,
   type LeadConnectorContact,
 } from "@/lib/leadconnector-api";
+
+// Temporary — for confirming how Estimates actually work in LeadConnector
+// before building the real "pull Scope of Work from the estimate" feature.
+// Safe to delete once that's built; read-only, Admin-only, doesn't touch
+// any Fieldwork data.
+export async function diagnoseLeadConnectorEstimate(contactId: string) {
+  await requireRole("ADMIN");
+  try {
+    return await fetchEstimateDiagnostic(contactId);
+  } catch (err) {
+    return {
+      status: 0,
+      ok: false,
+      url: "",
+      body: err instanceof Error ? err.message : "Request failed",
+    };
+  }
+}
 
 export type ImportCandidate = {
   eventId: string;

@@ -108,6 +108,31 @@ export function contactDisplayName(
   return name || fallback;
 }
 
+// One-off diagnostic for figuring out how Estimates actually work in this
+// account's LeadConnector API — not wired into any real feature yet. GHL's
+// own docs wouldn't render for me to confirm the endpoint shape, so this
+// hits the most likely v2 path (estimates live under /invoices/, same as
+// every other GHL v2 list endpoint scoped with altId/altType=location) and
+// returns the raw response so we can see exactly what comes back: a scope
+// error if the token can't read Invoices, or the real estimate shape if it
+// can. Once confirmed, this becomes a real typed function.
+export async function fetchEstimateDiagnostic(contactId: string): Promise<{
+  status: number;
+  ok: boolean;
+  url: string;
+  body: string;
+}> {
+  const url = new URL(`${API_BASE}/invoices/estimate/list`);
+  url.searchParams.set("altId", locationId());
+  url.searchParams.set("altType", "location");
+  url.searchParams.set("contactId", contactId);
+  url.searchParams.set("limit", "10");
+
+  const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
+  const body = await res.text();
+  return { status: res.status, ok: res.ok, url: url.toString(), body };
+}
+
 export function normalizeState(state: string | undefined): string | null {
   if (!state) return null;
   const trimmed = state.trim();
