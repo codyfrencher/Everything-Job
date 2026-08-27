@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/require-user";
 import { LeadConnectorImportPanel } from "@/components/leadconnector-import-panel";
+import { LeadConnectorScopeBackfill } from "@/components/leadconnector-scope-backfill";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function ImportPage() {
@@ -20,6 +21,15 @@ export default async function ImportPage() {
         </CardHeader>
         <CardContent>
           <LeadConnectorImportPanel />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Scope of work backfill</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LeadConnectorScopeBackfill />
         </CardContent>
       </Card>
     </div>

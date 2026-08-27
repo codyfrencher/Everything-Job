@@ -15,6 +15,54 @@ import {
   type LeadConnectorContact,
 } from "@/lib/leadconnector-api";
 
+export type BackfillResult =
+  | { error: string }
+  | { scanned: number; updated: number; noEstimate: number };
+
+// One-time cleanup for jobs that were created before Scope of Work
+// auto-fill existed. Only ever fills a blank Scope of Work — a job that
+// already has one (hand-typed, or already backfilled) is left alone, so
+// this is safe to run more than once.
+export async function backfillScopeOfWorkFromEstimates(): Promise<BackfillResult> {
+  const user = await requireRole("ADMIN");
+
+  const jobs = await db.job.findMany({
+    where: {
+      OR: [{ description: null }, { description: "" }],
+      customer: { externalId: { not: null } },
+    },
+    select: { id: true, customer: { select: { externalId: true } } },
+  });
+
+  let updated = 0;
+  let noEstimate = 0;
+
+  for (const job of jobs) {
+    const contactId = job.customer.externalId;
+    if (!contactId) continue;
+
+    const scope = await fetchScopeOfWorkFromEstimate(contactId);
+    if (!scope) {
+      noEstimate++;
+      continue;
+    }
+
+    await db.job.update({ where: { id: job.id }, data: { description: scope } });
+    await logJobAudit("edited", job.id, user.id, {
+      field: "description",
+      source: "leadconnector-backfill",
+    });
+    updated++;
+  }
+
+  if (updated > 0) {
+    revalidatePath("/jobs");
+    revalidatePath("/schedule");
+  }
+
+  return { scanned: jobs.length, updated, noEstimate };
+}
+
 export type ImportCandidate = {
   eventId: string;
   title: string;
