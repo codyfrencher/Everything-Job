@@ -27,6 +27,7 @@ export function JobPhotos({
   // whole camera roll on a job shouldn't wait for each photo's full round
   // trip before the next one even starts.
   const UPLOAD_CONCURRENCY = 3;
+  const UPLOAD_RETRIES = 2;
 
   function handleDelete(photoId: string) {
     if (!window.confirm("Delete this photo? This can't be undone.")) return;
@@ -34,6 +35,27 @@ export function JobPhotos({
     startTransition(() => {
       deleteJobPhoto(photoId).finally(() => setDeletingId(null));
     });
+  }
+
+  async function uploadOnePhoto(file: File): Promise<string | null> {
+    // A field connection can drop mid-request and come back a moment
+    // later — retry a network-level failure (the upload call throwing)
+    // rather than giving up on the first blip. A validation failure
+    // (wrong type, too large) comes back as a normal {error} result
+    // instead of a throw, and retrying that would just fail the same
+    // way again, so those return immediately.
+    for (let attempt = 1; attempt <= UPLOAD_RETRIES + 1; attempt++) {
+      try {
+        const formData = new FormData();
+        formData.set("file", file);
+        const result = await uploadJobPhoto(jobId, formData);
+        return result?.error ?? null;
+      } catch {
+        if (attempt > UPLOAD_RETRIES) return "couldn't upload — check your connection";
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+      }
+    }
+    return "couldn't upload — check your connection";
   }
 
   async function handleFiles(files: FileList | null) {
@@ -50,17 +72,10 @@ export function JobPhotos({
       const batch = fileList.slice(i, i + UPLOAD_CONCURRENCY);
       await Promise.all(
         batch.map(async (file) => {
-          try {
-            const formData = new FormData();
-            formData.set("file", file);
-            const result = await uploadJobPhoto(jobId, formData);
-            if (result?.error) failures.push(`${file.name}: ${result.error}`);
-          } catch {
-            failures.push(`${file.name}: couldn't upload`);
-          } finally {
-            completed += 1;
-            setProgress({ done: completed, total: fileList.length });
-          }
+          const error = await uploadOnePhoto(file);
+          if (error) failures.push(`${file.name}: ${error}`);
+          completed += 1;
+          setProgress({ done: completed, total: fileList.length });
         }),
       );
     }
