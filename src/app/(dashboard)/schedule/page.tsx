@@ -135,7 +135,7 @@ export default async function SchedulePage({
   const assignedTechIds = new Set(jobs.flatMap((j) => j.assignments.map((a) => a.userId)));
   const techs = await db.user.findMany({
     where: {
-      role: "TECH",
+      role: { in: ["TECH", "ADMIN"] },
       OR: [{ deactivatedAt: null }, { id: { in: [...assignedTechIds] } }],
       ...(isTech ? { id: user.id } : {}),
     },
