@@ -113,11 +113,6 @@ export default async function SchedulePage({
   const rangeStart = zonedStartOfDay(rangeStartStr);
   const rangeEnd = zonedEndOfDay(rangeEndStr);
 
-  const techs = await db.user.findMany({
-    where: { role: "TECH", ...(isTech ? { id: user.id } : {}) },
-    orderBy: { name: "asc" },
-  });
-
   const jobs = await db.job.findMany({
     where: {
       ...(isTech ? { assignments: { some: { userId: user.id } } } : {}),
@@ -131,6 +126,20 @@ export default async function SchedulePage({
       assignments: { select: { userId: true } },
     },
     orderBy: { scheduledStart: "asc" },
+  });
+
+  // Exclude deactivated techs from the "+ Add tech" dropdown, except one
+  // who's already assigned to a job in view — otherwise their name would
+  // silently disappear off that job's card instead of just becoming
+  // unassignable to new ones.
+  const assignedTechIds = new Set(jobs.flatMap((j) => j.assignments.map((a) => a.userId)));
+  const techs = await db.user.findMany({
+    where: {
+      role: "TECH",
+      OR: [{ deactivatedAt: null }, { id: { in: [...assignedTechIds] } }],
+      ...(isTech ? { id: user.id } : {}),
+    },
+    orderBy: { name: "asc" },
   });
 
   const unscheduled = jobs.filter((j) => !j.scheduledStart);
