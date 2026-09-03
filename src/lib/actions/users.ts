@@ -112,7 +112,9 @@ export async function updateTeamMember(
     return { error: "Could not update team member" };
   }
 
-  revalidatePath("/team");
+  // A name/role change is visible anywhere this tech is listed, not just
+  // Team — same staleness issue as deactivate/reactivate below.
+  revalidatePath("/", "layout");
   return { success: true };
 }
 
@@ -140,7 +142,11 @@ export async function deactivateTeamMember(userId: string) {
     data: { deactivatedAt: new Date() },
   });
 
-  revalidatePath("/team");
+  // Whether a tech is deactivated affects every page that lists assignable
+  // techs (Schedule, Jobs, the dashboard, individual job pages) — not just
+  // Team, where revalidatePath("/team") alone previously left those other
+  // pages serving a stale cached render even after the change took effect.
+  revalidatePath("/", "layout");
 }
 
 export async function reactivateTeamMember(userId: string) {
@@ -151,5 +157,5 @@ export async function reactivateTeamMember(userId: string) {
     data: { deactivatedAt: null },
   });
 
-  revalidatePath("/team");
+  revalidatePath("/", "layout");
 }
