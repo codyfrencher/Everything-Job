@@ -53,7 +53,12 @@ export function JobDispatchCard({
   const assignedTechs = assignedIds
     .map((id) => techs.find((t) => t.id === id))
     .filter((t): t is User => !!t);
-  const unassignedTechs = techs.filter((t) => !assignedIds.includes(t.id));
+  // A deactivated tech can still be in `techs` — e.g. so their name shows
+  // correctly on a job they're already assigned to elsewhere on the same
+  // page — but they should never be offered as a new assignment here.
+  const unassignedTechs = techs.filter(
+    (t) => !assignedIds.includes(t.id) && !t.deactivatedAt,
+  );
 
   function handleAdd(userId: string) {
     const previous = assignedIds;
