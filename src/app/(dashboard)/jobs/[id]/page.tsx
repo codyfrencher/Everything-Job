@@ -15,6 +15,13 @@ import { JobPhotos } from "@/components/job-photos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Raises the default timeout for every Server Action on this page — in
+// particular photo uploads, which can be several MB each over a mobile
+// connection where signal strength (full bars) doesn't guarantee actual
+// upload speed. The platform default is too short for a slow upload of
+// a large photo to reliably finish before being killed mid-request.
+export const maxDuration = 60;
+
 function formatSchedule(start: Date | null, end: Date | null): string | null {
   if (!start) return null;
   const startLabel = formatInTimeZone(start, COMPANY_TIME_ZONE, "EEE, MMM d 'at' h:mm a");
