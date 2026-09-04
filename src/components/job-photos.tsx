@@ -42,6 +42,7 @@ export function JobPhotos({
   }
 
   async function uploadOnePhoto(file: File): Promise<string | null> {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
     // A field connection can drop mid-request and come back a moment
     // later — retry a network-level failure (the upload call throwing)
     // rather than giving up on the first blip. A validation failure
@@ -54,12 +55,19 @@ export function JobPhotos({
         formData.set("file", file);
         const result = await uploadJobPhoto(jobId, formData);
         return result?.error ?? null;
-      } catch {
-        if (attempt > UPLOAD_RETRIES) return "couldn't upload — check your connection";
+      } catch (err) {
+        if (attempt > UPLOAD_RETRIES) {
+          // Include the file size and whatever detail the browser gives
+          // for the failed request — a generic "check your connection"
+          // with no numbers wasn't enough to tell a slow-connection
+          // timeout apart from a specific file being unusually large.
+          const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
+          return `${sizeMb}MB — couldn't upload, check your connection${detail}`;
+        }
         await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
       }
     }
-    return "couldn't upload — check your connection";
+    return `${sizeMb}MB — couldn't upload, check your connection`;
   }
 
   async function handleFiles(files: FileList | null) {
