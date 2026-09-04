@@ -36,6 +36,19 @@ export async function uploadJobPhoto(jobId: string, formData: FormData) {
     return { error: "Photo is too large (max 10MB)" };
   }
 
+  const rawKey = formData.get("uploadKey");
+  const uploadKey = typeof rawKey === "string" && rawKey ? rawKey : undefined;
+
+  // The client retries a failed-looking upload, but "failed" here can mean
+  // the request actually succeeded server-side and only the confirmation
+  // back to the client got lost. uploadKey is stable across those retries,
+  // so if this exact upload already landed, treat the retry as a no-op
+  // instead of saving the same photo again.
+  if (uploadKey) {
+    const existing = await db.jobPhoto.findFirst({ where: { jobId, uploadKey } });
+    if (existing) return;
+  }
+
   try {
     const blob = await put(file.name, file, {
       access: "public",
@@ -43,9 +56,15 @@ export async function uploadJobPhoto(jobId: string, formData: FormData) {
     });
 
     await db.jobPhoto.create({
-      data: { jobId, url: blob.url, uploadedById: user.id },
+      data: { jobId, url: blob.url, uploadedById: user.id, uploadKey },
     });
   } catch (err) {
+    // A unique-constraint hit on [jobId, uploadKey] means a concurrent
+    // retry already saved this exact upload — not a real failure.
+    if (uploadKey && (await db.jobPhoto.findFirst({ where: { jobId, uploadKey } }))) {
+      revalidatePath(`/jobs/${jobId}`);
+      return;
+    }
     console.error("uploadJobPhoto failed", err);
     return { error: "Upload failed. Please try again." };
   }

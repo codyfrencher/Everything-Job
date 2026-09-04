@@ -43,6 +43,11 @@ export function JobPhotos({
 
   async function uploadOnePhoto(file: File): Promise<string | null> {
     const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    // Stable across every retry attempt for this file, so the server can
+    // tell "this is a retry of an upload that actually already landed"
+    // apart from "this is a genuinely new upload" — see uploadKey in
+    // job-photos.ts.
+    const uploadKey = crypto.randomUUID();
     // A field connection can drop mid-request and come back a moment
     // later — retry a network-level failure (the upload call throwing)
     // rather than giving up on the first blip. A validation failure
@@ -53,6 +58,7 @@ export function JobPhotos({
       try {
         const formData = new FormData();
         formData.set("file", file);
+        formData.set("uploadKey", uploadKey);
         const result = await uploadJobPhoto(jobId, formData);
         return result?.error ?? null;
       } catch (err) {

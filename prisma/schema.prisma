@@ -125,6 +125,13 @@ model JobPhoto {
   uploadedById String?
   uploadedBy   User?   @relation("JobPhotoUploadedBy", fields: [uploadedById], references: [id])
 
+  // Client-generated per-file key, stable across a file's retry attempts.
+  // If the upload actually succeeds server-side but the client never gets a
+  // usable response (and retries), this stops the retry from saving the
+  // same photo a second time.
+  uploadKey String?
+
+  @@unique([jobId, uploadKey])
   @@index([jobId])
 }
 
