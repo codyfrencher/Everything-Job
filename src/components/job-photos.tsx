@@ -23,10 +23,14 @@ export function JobPhotos({
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Upload a few at once instead of fully sequentially — a tech dumping a
-  // whole camera roll on a job shouldn't wait for each photo's full round
-  // trip before the next one even starts.
-  const UPLOAD_CONCURRENCY = 3;
+  // Upload a couple at once instead of fully sequentially — a tech dumping
+  // a whole camera roll on a job shouldn't wait for each photo's full
+  // round trip before the next one even starts. Kept low (not higher) on
+  // purpose: these are full-size phone photos, and on a mobile connection
+  // "full bars" reflects signal strength, not actual upload bandwidth —
+  // too many large uploads competing for the same slow pipe increases the
+  // odds any one of them times out.
+  const UPLOAD_CONCURRENCY = 2;
   const UPLOAD_RETRIES = 2;
 
   function handleDelete(photoId: string) {
