@@ -45,7 +45,7 @@ export default async function JobsPage({
   const techs = isTech
     ? []
     : await db.user.findMany({
-        where: { role: "TECH" },
+        where: { role: { in: ["TECH", "ADMIN"] } },
         orderBy: { name: "asc" },
       });
 

@@ -55,7 +55,7 @@ export default async function JobDetailPage({
       // (and get dropped on save) just because the form no longer lists
       // them as an assignable option.
       where: {
-        role: "TECH",
+        role: { in: ["TECH", "ADMIN"] },
         OR: [{ deactivatedAt: null }, { id: { in: assignedUserIds } }],
       },
       orderBy: { name: "asc" },

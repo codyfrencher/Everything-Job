@@ -15,7 +15,11 @@ import {
 } from "@/lib/job-rules";
 import { parseZonedDateTime } from "@/lib/timezone";
 import { logJobAudit } from "@/lib/audit";
-import type { JobStatus } from "@prisma/client";
+import type { JobStatus, Role } from "@prisma/client";
+
+// Who can actually be sent out to a job — Techs are the default, but an
+// Admin sometimes works a job themselves.
+const ASSIGNABLE_ROLES: Role[] = ["TECH", "ADMIN"];
 
 export type FormState = { error?: string } | undefined;
 
@@ -62,8 +66,11 @@ function toJobData(data: ReturnType<typeof parseJobForm>) {
 async function assertAssignableTechs(userIds: string[]): Promise<string | null> {
   if (userIds.length === 0) return null;
   const targets = await db.user.findMany({ where: { id: { in: userIds } } });
-  if (targets.length !== userIds.length || targets.some((t) => t.role !== "TECH")) {
-    return "Jobs can only be assigned to Techs";
+  if (
+    targets.length !== userIds.length ||
+    targets.some((t) => !ASSIGNABLE_ROLES.includes(t.role))
+  ) {
+    return "Jobs can only be assigned to Techs or Admins";
   }
   return null;
 }
