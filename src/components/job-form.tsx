@@ -202,6 +202,9 @@ export function JobForm({
       {state?.error ? (
         <p className="text-sm text-destructive">{state.error}</p>
       ) : null}
+      {state?.warning ? (
+        <p className="text-sm text-amber-600">{state.warning}</p>
+      ) : null}
 
       <Button type="submit" disabled={pending}>
         {pending ? "Saving..." : submitLabel}

@@ -34,6 +34,7 @@ export function JobDispatchCard({
   const [isPending, startTransition] = useTransition();
   const [assignedIds, setAssignedIds] = useState(job.assignments.map((a) => a.userId));
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignWarning, setAssignWarning] = useState<string | null>(null);
   const directions = directionsUrl(job);
 
   // The same job can render as more than one card at once (once per tech
@@ -64,9 +65,14 @@ export function JobDispatchCard({
     const previous = assignedIds;
     setAssignedIds([...assignedIds, userId]);
     setAssignError(null);
+    setAssignWarning(null);
     startTransition(async () => {
       try {
-        await assignTechToJob(job.id, userId);
+        // A double-booking conflict comes back as a warning, not a thrown
+        // error — the assignment still goes through, this just surfaces
+        // the heads-up instead of silently swallowing it.
+        const result = await assignTechToJob(job.id, userId);
+        if (result?.warning) setAssignWarning(result.warning);
       } catch (err) {
         setAssignedIds(previous);
         setAssignError(err instanceof Error ? err.message : "Could not assign tech");
@@ -78,6 +84,7 @@ export function JobDispatchCard({
     const previous = assignedIds;
     setAssignedIds(assignedIds.filter((id) => id !== userId));
     setAssignError(null);
+    setAssignWarning(null);
     startTransition(async () => {
       try {
         await unassignTechFromJob(job.id, userId);
@@ -160,6 +167,9 @@ export function JobDispatchCard({
                 </Select>
                 {assignError ? (
                   <p className="mt-1 text-xs text-destructive">{assignError}</p>
+                ) : null}
+                {assignWarning ? (
+                  <p className="mt-1 text-xs text-amber-600">{assignWarning}</p>
                 ) : null}
               </div>
             ) : null}
