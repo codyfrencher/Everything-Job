@@ -2,6 +2,7 @@
 
 import { Suspense, useActionState } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 import { loginAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="items-center text-center">
+          <Image src="/bwmp-logo.svg" alt="Blackwater Mold Pros" width={72} height={72} />
           <CardTitle className="text-2xl">Fieldwork</CardTitle>
           <CardDescription>
             Sign in to manage jobs, customers, and the schedule.

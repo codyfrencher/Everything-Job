@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { auth } from "@/lib/auth";
 import { LogoutButton } from "@/components/logout-button";
@@ -26,7 +27,8 @@ export async function Nav() {
     <header className="relative border-b bg-background">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
-          <Link href="/" className="shrink-0 text-lg font-semibold">
+          <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-semibold">
+            <Image src="/bwmp-logo.svg" alt="" width={32} height={32} className="h-8 w-8" />
             Fieldwork
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
