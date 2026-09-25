@@ -20,6 +20,6 @@ export const proxy = auth((req) => {
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/webhooks|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon.png|icon.svg|bwmp-logo.svg).*)",
+    "/((?!api/auth|api/webhooks|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon.png|icon.svg|apple-icon.png|bwmp-logo.svg).*)",
   ],
 };
