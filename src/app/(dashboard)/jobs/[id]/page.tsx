@@ -12,6 +12,7 @@ import { JobScopeControl } from "@/components/job-scope-control";
 import { JobNotesControl } from "@/components/job-notes-control";
 import { JobOverflowMenu } from "@/components/job-overflow-menu";
 import { JobPhotos } from "@/components/job-photos";
+import { JobMaterialsEstimate } from "@/components/job-materials-estimate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -54,7 +55,7 @@ export default async function JobDetailPage({
 
   const canManage = user.role === "ADMIN" || user.role === "DISPATCHER";
 
-  const [customers, techs] = await Promise.all([
+  const [customers, techs, materials] = await Promise.all([
     db.customer.findMany({
       where: { OR: [{ archivedAt: null }, { id: job.customerId }] },
       orderBy: { name: "asc" },
@@ -70,6 +71,7 @@ export default async function JobDetailPage({
       },
       orderBy: { name: "asc" },
     }),
+    db.material.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" } }),
   ]);
 
   const deleteJobWithId = deleteJob.bind(null, job.id);
@@ -130,6 +132,22 @@ export default async function JobDetailPage({
         </p>
         <JobNotesControl jobId={job.id} notes={job.notes} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Materials estimate</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <JobMaterialsEstimate
+            jobId={job.id}
+            materials={materials}
+            estimatedSqft={job.estimatedSqft}
+            estimatedRooms={job.estimatedRooms}
+            scope={job.description}
+            canEdit={canManage}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

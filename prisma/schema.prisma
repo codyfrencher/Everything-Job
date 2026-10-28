@@ -24,6 +24,12 @@ enum JobStatus {
   CANCELLED
 }
 
+enum MaterialCalcType {
+  PER_SQFT
+  PER_ROOM
+  FLAT
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -82,6 +88,12 @@ model Job {
 
   notes String?
 
+  // Guesstimate inputs for the materials estimate — manually entered (or
+  // pre-filled by guessing off the Scope of Work text), and otherwise
+  // left null so materials that need them just don't show an estimate.
+  estimatedSqft  Int?
+  estimatedRooms Int?
+
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -98,6 +110,25 @@ model Job {
 
   @@index([status])
   @@index([scheduledStart])
+}
+
+model Material {
+  id       String           @id @default(cuid())
+  name     String
+  unit     String // e.g. "roll", "case", "each", "gallon"
+  calcType MaterialCalcType
+
+  // Meaning depends on calcType:
+  //   PER_SQFT -> sqft one unit covers (quantity = ceil(job sqft / rate))
+  //   PER_ROOM -> units needed per room (quantity = ceil(job rooms * rate))
+  //   FLAT     -> the quantity itself, independent of job size
+  rate     Float
+  unitCost Float
+
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
+
+  @@index([archivedAt])
 }
 
 model JobAssignment {

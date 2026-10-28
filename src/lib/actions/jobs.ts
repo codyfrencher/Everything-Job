@@ -7,7 +7,11 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/require-user";
 import { notifyUser } from "@/lib/push";
-import { jobSchema, techJobUpdateSchema } from "@/lib/validators";
+import {
+  jobSchema,
+  techJobUpdateSchema,
+  jobMaterialsInputsSchema,
+} from "@/lib/validators";
 import {
   assertNoOverlap,
   assertValidJobState,
@@ -336,6 +340,39 @@ export async function updateJobScope(jobId: string, description: string) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");
+}
+
+// The two inputs that drive the materials estimate — same edit
+// permissions as Scope of Work, since they're both dispatch-level
+// judgment calls a Tech doesn't make.
+export async function updateJobMaterialsInputs(jobId: string, formData: FormData) {
+  await requireRole("ADMIN", "DISPATCHER");
+
+  const existing = await db.job.findUnique({ where: { id: jobId } });
+  if (!existing) throw new Error("Job not found");
+
+  let data;
+  try {
+    data = jobMaterialsInputsSchema.parse({
+      estimatedSqft: formData.get("estimatedSqft"),
+      estimatedRooms: formData.get("estimatedRooms"),
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      throw new Error(err.issues[0]?.message ?? "Invalid dimensions");
+    }
+    throw err;
+  }
+
+  await db.job.update({
+    where: { id: jobId },
+    data: {
+      estimatedSqft: data.estimatedSqft || null,
+      estimatedRooms: data.estimatedRooms || null,
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
 }
 
 export async function updateJobStatus(jobId: string, status: JobStatus) {
