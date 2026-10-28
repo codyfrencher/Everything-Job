@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 
 import { updateJobMaterialsInputs } from "@/lib/actions/jobs";
 import { computeMaterialsEstimate, guessDimensionsFromScope } from "@/lib/materials-estimate";
@@ -130,6 +131,22 @@ export function JobMaterialsEstimate({
             <TableBody>
               {lines.map((line) => (
                 <TableRow key={line.materialId}>
+                  <TableCell className="w-10 py-1.5 pr-0">
+                    {line.photoUrl ? (
+                      // Links out to the full-size photo — so a tech unsure
+                      // which product this is can tap through for a clear
+                      // look, not just a thumbnail.
+                      <a href={line.photoUrl} target="_blank" rel="noreferrer">
+                        <Image
+                          src={line.photoUrl}
+                          alt=""
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 rounded-md border object-cover"
+                        />
+                      </a>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="py-1.5">{line.name}</TableCell>
                   <TableCell className="py-1.5 text-right text-muted-foreground">
                     {line.quantity} {line.unit}

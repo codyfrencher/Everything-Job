@@ -125,6 +125,10 @@ model Material {
   rate     Float
   unitCost Float
 
+  // Reference photo so a tech can tell which specific product this is,
+  // not just a name on a list.
+  photoUrl String?
+
   createdAt  DateTime  @default(now())
   archivedAt DateTime?
 

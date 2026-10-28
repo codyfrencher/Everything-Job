@@ -4,6 +4,7 @@ import { MaterialForm } from "@/components/material-form";
 import { MaterialRow } from "@/components/material-row";
 import { EditMaterialControl } from "@/components/edit-material-control";
 import { ArchiveMaterialControl } from "@/components/archive-material-control";
+import { MaterialPhotoControl } from "@/components/material-photo-control";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -66,6 +67,12 @@ export default async function MaterialsPage() {
                         {material.rate} {material.unit} · ${material.unitCost.toFixed(2)}/
                         {material.unit}
                       </p>
+                      <div className="mt-2">
+                        <MaterialPhotoControl
+                          materialId={material.id}
+                          photoUrl={material.photoUrl}
+                        />
+                      </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <EditMaterialControl
                           materialId={material.id}
@@ -89,6 +96,7 @@ export default async function MaterialsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Photo</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Unit</TableHead>
                         <TableHead>Scales by</TableHead>
@@ -107,6 +115,7 @@ export default async function MaterialsPage() {
                           calcType={material.calcType}
                           rate={material.rate}
                           unitCost={material.unitCost}
+                          photoUrl={material.photoUrl}
                           isArchived={!!material.archivedAt}
                         />
                       ))}

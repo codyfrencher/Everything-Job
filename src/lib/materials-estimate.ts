@@ -7,6 +7,7 @@ export type MaterialEstimateLine = {
   quantity: number;
   unitCost: number;
   lineTotal: number;
+  photoUrl: string | null;
 };
 
 export type MaterialsEstimate = {
@@ -51,6 +52,7 @@ export function computeMaterialsEstimate(
       quantity,
       unitCost: material.unitCost,
       lineTotal,
+      photoUrl: material.photoUrl,
     });
   }
 

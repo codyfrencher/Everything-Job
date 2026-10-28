@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { EditMaterialForm } from "@/components/edit-material-control";
 import { ArchiveMaterialControl } from "@/components/archive-material-control";
+import { MaterialPhotoControl } from "@/components/material-photo-control";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -22,6 +23,7 @@ export function MaterialRow({
   calcType,
   rate,
   unitCost,
+  photoUrl,
   isArchived,
 }: {
   materialId: string;
@@ -30,6 +32,7 @@ export function MaterialRow({
   calcType: MaterialCalcType;
   rate: number;
   unitCost: number;
+  photoUrl: string | null;
   isArchived: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -37,7 +40,7 @@ export function MaterialRow({
   if (editing) {
     return (
       <TableRow>
-        <TableCell colSpan={6} className="whitespace-normal">
+        <TableCell colSpan={7} className="whitespace-normal">
           <EditMaterialForm
             materialId={materialId}
             name={name}
@@ -54,6 +57,9 @@ export function MaterialRow({
 
   return (
     <TableRow className={isArchived ? "opacity-60" : ""}>
+      <TableCell>
+        <MaterialPhotoControl materialId={materialId} photoUrl={photoUrl} />
+      </TableCell>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="text-muted-foreground">{unit}</TableCell>
       <TableCell>
