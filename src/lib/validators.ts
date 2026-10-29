@@ -57,15 +57,5 @@ export const editUserSchema = z.object({
 
 export const materialSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  unit: z.string().min(1, "Unit is required"),
-  calcType: z.enum(["PER_SQFT", "PER_ROOM", "FLAT"]),
-  rate: z.coerce.number().positive("Must be a positive number"),
-  unitCost: z.coerce.number().min(0, "Must be zero or more"),
-});
-
-// Blank strings from an optional number input come through as "" — the
-// browser can't send an actual null — so treat "" the same as absent.
-export const jobMaterialsInputsSchema = z.object({
-  estimatedSqft: z.coerce.number().int().positive().optional().or(z.literal("")),
-  estimatedRooms: z.coerce.number().int().positive().optional().or(z.literal("")),
+  keywords: z.string().optional().or(z.literal("")),
 });

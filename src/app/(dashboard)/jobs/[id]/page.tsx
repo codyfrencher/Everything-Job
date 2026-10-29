@@ -12,7 +12,7 @@ import { JobScopeControl } from "@/components/job-scope-control";
 import { JobNotesControl } from "@/components/job-notes-control";
 import { JobOverflowMenu } from "@/components/job-overflow-menu";
 import { JobPhotos } from "@/components/job-photos";
-import { JobMaterialsEstimate } from "@/components/job-materials-estimate";
+import { JobSuppliesChecklist } from "@/components/job-supplies-checklist";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -47,6 +47,7 @@ export default async function JobDetailPage({
       customer: true,
       photos: { orderBy: { createdAt: "desc" } },
       assignments: { select: { userId: true } },
+      supplies: { select: { materialId: true } },
     },
   });
   if (!job) notFound();
@@ -135,14 +136,13 @@ export default async function JobDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Materials estimate</CardTitle>
+          <CardTitle>Supplies</CardTitle>
         </CardHeader>
         <CardContent>
-          <JobMaterialsEstimate
+          <JobSuppliesChecklist
             jobId={job.id}
             materials={materials}
-            estimatedSqft={job.estimatedSqft}
-            estimatedRooms={job.estimatedRooms}
+            selectedIds={job.supplies.map((s) => s.materialId)}
             scope={job.description}
             canEdit={canManage}
           />

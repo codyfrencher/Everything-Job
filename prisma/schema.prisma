@@ -24,12 +24,6 @@ enum JobStatus {
   CANCELLED
 }
 
-enum MaterialCalcType {
-  PER_SQFT
-  PER_ROOM
-  FLAT
-}
-
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -88,12 +82,6 @@ model Job {
 
   notes String?
 
-  // Guesstimate inputs for the materials estimate — manually entered (or
-  // pre-filled by guessing off the Scope of Work text), and otherwise
-  // left null so materials that need them just don't show an estimate.
-  estimatedSqft  Int?
-  estimatedRooms Int?
-
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -102,7 +90,8 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  photos JobPhoto[]
+  photos   JobPhoto[]
+  supplies JobSupply[]
 
   // LeadConnector calendar event id, set when a job is created by the
   // import tool — lets a re-run skip appointments already brought in.
@@ -112,27 +101,45 @@ model Job {
   @@index([scheduledStart])
 }
 
+// A reusable supply catalog, not a quantity/cost estimator — each job
+// gets a checklist of which of these to bring, picked by hand (optionally
+// pre-suggested by keyword match against the Scope of Work), not a
+// calculated quantity. Real jobs vary too much per-room, per-object
+// judgment for a formula to size this reliably.
 model Material {
-  id       String           @id @default(cuid())
-  name     String
-  unit     String // e.g. "roll", "case", "each", "gallon"
-  calcType MaterialCalcType
-
-  // Meaning depends on calcType:
-  //   PER_SQFT -> sqft one unit covers (quantity = ceil(job sqft / rate))
-  //   PER_ROOM -> units needed per room (quantity = ceil(job rooms * rate))
-  //   FLAT     -> the quantity itself, independent of job size
-  rate     Float
-  unitCost Float
+  id   String @id @default(cuid())
+  name String
 
   // Reference photo so a tech can tell which specific product this is,
   // not just a name on a list.
   photoUrl String?
 
+  // Comma-separated trigger words (e.g. "ceiling, vaulted, high ceiling")
+  // — when any appears in a job's Scope of Work, this item is suggested
+  // (pre-checked) on that job's supply checklist. Purely a convenience;
+  // every item stays freely toggleable regardless of a match.
+  keywords String?
+
   createdAt  DateTime  @default(now())
   archivedAt DateTime?
 
+  jobs JobSupply[]
+
   @@index([archivedAt])
+}
+
+model JobSupply {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, materialId])
+  @@index([jobId])
 }
 
 model JobAssignment {

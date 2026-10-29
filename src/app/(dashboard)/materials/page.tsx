@@ -14,13 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { MaterialCalcType } from "@prisma/client";
-
-const calcTypeLabels: Record<MaterialCalcType, string> = {
-  PER_SQFT: "Square footage",
-  PER_ROOM: "Room count",
-  FLAT: "Flat",
-};
 
 export default async function MaterialsPage() {
   await requireRole("ADMIN");
@@ -32,8 +25,9 @@ export default async function MaterialsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Materials</h1>
         <p className="text-sm text-muted-foreground">
-          The catalog behind each job&apos;s materials estimate — set how a material
-          scales with job size and what it costs per unit.
+          The supply catalog techs pick from on each job&apos;s checklist — add a
+          reference photo and optional keywords to get it pre-suggested when a
+          job&apos;s Scope of Work mentions them.
         </p>
       </div>
 
@@ -44,7 +38,7 @@ export default async function MaterialsPage() {
           </CardHeader>
           <CardContent className="p-0">
             {materials.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">No materials yet.</p>
+              <p className="p-4 text-sm text-muted-foreground">No supplies yet.</p>
             ) : (
               <>
                 {/* Mobile: stacked cards */}
@@ -56,17 +50,13 @@ export default async function MaterialsPage() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-medium">{material.name}</span>
-                        <div className="flex gap-1.5">
-                          {material.archivedAt ? (
-                            <Badge variant="outline">Archived</Badge>
-                          ) : null}
-                          <Badge variant="secondary">{calcTypeLabels[material.calcType]}</Badge>
-                        </div>
+                        {material.archivedAt ? <Badge variant="outline">Archived</Badge> : null}
                       </div>
-                      <p className="mt-1 text-muted-foreground">
-                        {material.rate} {material.unit} · ${material.unitCost.toFixed(2)}/
-                        {material.unit}
-                      </p>
+                      {material.keywords ? (
+                        <p className="mt-1 text-muted-foreground">
+                          Suggested when scope mentions: {material.keywords}
+                        </p>
+                      ) : null}
                       <div className="mt-2">
                         <MaterialPhotoControl
                           materialId={material.id}
@@ -77,10 +67,7 @@ export default async function MaterialsPage() {
                         <EditMaterialControl
                           materialId={material.id}
                           name={material.name}
-                          unit={material.unit}
-                          calcType={material.calcType}
-                          rate={material.rate}
-                          unitCost={material.unitCost}
+                          keywords={material.keywords}
                         />
                         <ArchiveMaterialControl
                           materialId={material.id}
@@ -98,10 +85,7 @@ export default async function MaterialsPage() {
                       <TableRow>
                         <TableHead>Photo</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Unit</TableHead>
-                        <TableHead>Scales by</TableHead>
-                        <TableHead>Rate</TableHead>
-                        <TableHead>Unit cost</TableHead>
+                        <TableHead>Suggest when scope mentions</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -111,10 +95,7 @@ export default async function MaterialsPage() {
                           key={material.id}
                           materialId={material.id}
                           name={material.name}
-                          unit={material.unit}
-                          calcType={material.calcType}
-                          rate={material.rate}
-                          unitCost={material.unitCost}
+                          keywords={material.keywords}
                           photoUrl={material.photoUrl}
                           isArchived={!!material.archivedAt}
                         />
@@ -129,7 +110,7 @@ export default async function MaterialsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Add a material</CardTitle>
+            <CardTitle>Add a supply</CardTitle>
           </CardHeader>
           <CardContent>
             <MaterialForm />

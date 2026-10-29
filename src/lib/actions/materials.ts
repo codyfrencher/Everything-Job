@@ -14,13 +14,11 @@ const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
 export type MaterialFormState = { error?: string } | undefined;
 
 function parseMaterialForm(formData: FormData) {
-  return materialSchema.parse({
+  const data = materialSchema.parse({
     name: formData.get("name"),
-    unit: formData.get("unit"),
-    calcType: formData.get("calcType"),
-    rate: formData.get("rate"),
-    unitCost: formData.get("unitCost"),
+    keywords: formData.get("keywords"),
   });
+  return { name: data.name, keywords: data.keywords || null };
 }
 
 export async function createMaterial(
@@ -39,6 +37,10 @@ export async function createMaterial(
     return { error: "Could not add material" };
   }
 
+  // A new/renamed material (or changed keywords) can change what's
+  // suggested on every job's checklist — same "revalidatePath doesn't
+  // cascade" lesson as the deactivated-tech fix, so this clears the whole
+  // cache instead of guessing which job pages to target individually.
   revalidatePath("/", "layout");
 }
 
@@ -59,10 +61,6 @@ export async function updateMaterial(
     return { error: "Could not update material" };
   }
 
-  // A price/rate change here changes every job's materials estimate, not
-  // just one path — same "revalidatePath doesn't cascade" lesson as the
-  // deactivated-tech fix, so this clears the whole cache instead of
-  // guessing which job pages to target individually.
   revalidatePath("/", "layout");
 }
 
@@ -118,4 +116,23 @@ export async function removeMaterialPhoto(materialId: string) {
   await del(material.photoUrl).catch(() => {});
 
   revalidatePath("/", "layout");
+}
+
+// Checking/unchecking a supply on a job's "what to bring" list — same
+// edit permissions as Scope of Work, since deciding what a job needs is
+// a dispatch-level judgment call, not something a Tech sets.
+export async function toggleJobSupply(jobId: string, materialId: string, checked: boolean) {
+  await requireRole("ADMIN", "DISPATCHER");
+
+  if (checked) {
+    await db.jobSupply.upsert({
+      where: { jobId_materialId: { jobId, materialId } },
+      create: { jobId, materialId },
+      update: {},
+    });
+  } else {
+    await db.jobSupply.deleteMany({ where: { jobId, materialId } });
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
 }
