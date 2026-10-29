@@ -21,7 +21,7 @@ import type { JobStatus, Role } from "@prisma/client";
 // Admin sometimes works a job themselves.
 const ASSIGNABLE_ROLES: Role[] = ["TECH", "ADMIN"];
 
-export type FormState = { error?: string } | undefined;
+export type FormState = { error?: string; warning?: string } | undefined;
 
 function parseJobForm(formData: FormData) {
   const assignedToIds = formData
@@ -92,6 +92,7 @@ export async function createJob(
 
   let job;
   let assignedToIds: string[] = [];
+  let overlapWarning: string | null = null;
   try {
     const data = parseJobForm(formData);
     assignedToIds = data.assignedToIds;
@@ -116,12 +117,15 @@ export async function createJob(
     });
     if (stateError) return { error: stateError };
 
-    const overlapError = await assertNoOverlap({
+    // A double-booking isn't blocked — dispatchers sometimes need to
+    // schedule a tech across two jobs on purpose (e.g. a quick stop
+    // between two longer ones) — but it's surfaced as a heads-up so it's
+    // never silent.
+    overlapWarning = await assertNoOverlap({
       assignedUserIds: assignedToIds,
       scheduledStart: jobData.scheduledStart,
       scheduledEnd: jobData.scheduledEnd,
     });
-    if (overlapError) return { error: overlapError };
 
     job = await db.job.create({
       data: {
@@ -151,7 +155,11 @@ export async function createJob(
   revalidatePath("/jobs");
   revalidatePath("/schedule");
   revalidatePath("/");
-  redirect(`/jobs/${job.id}`);
+  redirect(
+    overlapWarning
+      ? `/jobs/${job.id}?warning=${encodeURIComponent(overlapWarning)}`
+      : `/jobs/${job.id}`,
+  );
 }
 
 export async function updateJob(
@@ -161,6 +169,7 @@ export async function updateJob(
 ): Promise<FormState> {
   const user = await requireUser();
   let newlyAssignedIds: string[] = [];
+  let overlapWarning: string | null = null;
 
   try {
     const existing = await db.job.findUnique({
@@ -230,13 +239,12 @@ export async function updateJob(
     });
     if (stateError) return { error: stateError };
 
-    const overlapError = await assertNoOverlap({
+    overlapWarning = await assertNoOverlap({
       jobId,
       assignedUserIds: assignedToIds,
       scheduledStart: jobData.scheduledStart,
       scheduledEnd: jobData.scheduledEnd,
     });
-    if (overlapError) return { error: overlapError };
 
     const removedIds = existingAssignedIds.filter((id) => !assignedToIds.includes(id));
 
@@ -277,6 +285,8 @@ export async function updateJob(
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/schedule");
   revalidatePath("/");
+
+  return overlapWarning ? { warning: overlapWarning } : undefined;
 }
 
 async function assertJobAccess(jobId: string) {
@@ -366,7 +376,10 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
   revalidatePath("/");
 }
 
-export async function assignTechToJob(jobId: string, userId: string) {
+export async function assignTechToJob(
+  jobId: string,
+  userId: string,
+): Promise<{ warning?: string } | undefined> {
   const user = await requireRole("ADMIN", "DISPATCHER");
 
   const assignableError = await assertAssignableTechs([userId]);
@@ -379,13 +392,14 @@ export async function assignTechToJob(jobId: string, userId: string) {
   if (!existing) throw new Error("Job not found");
   if (existing.assignments.some((a) => a.userId === userId)) return;
 
-  const overlapError = await assertNoOverlap({
+  // A double-booking isn't blocked — see the matching comment in
+  // createJob — just surfaced as a heads-up alongside the assignment.
+  const overlapWarning = await assertNoOverlap({
     jobId,
     assignedUserIds: [userId],
     scheduledStart: existing.scheduledStart,
     scheduledEnd: existing.scheduledEnd,
   });
-  if (overlapError) throw new Error(overlapError);
 
   // Promote UNSCHEDULED -> SCHEDULED when there's already a time set.
   let nextStatus = existing.status;
@@ -410,6 +424,8 @@ export async function assignTechToJob(jobId: string, userId: string) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/schedule");
   revalidatePath("/");
+
+  return overlapWarning ? { warning: overlapWarning } : undefined;
 }
 
 export async function unassignTechFromJob(jobId: string, userId: string) {

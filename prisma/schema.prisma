@@ -90,7 +90,8 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  photos JobPhoto[]
+  photos   JobPhoto[]
+  supplies JobSupply[]
 
   // LeadConnector calendar event id, set when a job is created by the
   // import tool — lets a re-run skip appointments already brought in.
@@ -98,6 +99,47 @@ model Job {
 
   @@index([status])
   @@index([scheduledStart])
+}
+
+// A reusable supply catalog, not a quantity/cost estimator — each job
+// gets a checklist of which of these to bring, picked by hand (optionally
+// pre-suggested by keyword match against the Scope of Work), not a
+// calculated quantity. Real jobs vary too much per-room, per-object
+// judgment for a formula to size this reliably.
+model Material {
+  id   String @id @default(cuid())
+  name String
+
+  // Reference photo so a tech can tell which specific product this is,
+  // not just a name on a list.
+  photoUrl String?
+
+  // Comma-separated trigger words (e.g. "ceiling, vaulted, high ceiling")
+  // — when any appears in a job's Scope of Work, this item is suggested
+  // (pre-checked) on that job's supply checklist. Purely a convenience;
+  // every item stays freely toggleable regardless of a match.
+  keywords String?
+
+  createdAt  DateTime  @default(now())
+  archivedAt DateTime?
+
+  jobs JobSupply[]
+
+  @@index([archivedAt])
+}
+
+model JobSupply {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, materialId])
+  @@index([jobId])
 }
 
 model JobAssignment {
